@@ -99,6 +99,7 @@ const api = {
     list:   (role)     => api.get('/admin/sections' + (role ? '?role=' + role : '')),
     create: (data)     => api.post('/admin/sections', data),
     update: (id, data) => api.put('/admin/sections/' + id, data),
+    order:  (id, ord)  => api.put('/admin/sections/' + id + '/order', { order: ord }),
     delete: (id)       => api.delete('/admin/sections/' + id),
     uploadPhoto: (id, form) => apiRequest('POST', '/admin/sections/' + id + '/photos', form, true),
     deletePhoto: (sId, pId) => api.delete('/admin/sections/' + sId + '/photos/' + pId),

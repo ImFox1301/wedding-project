@@ -19,14 +19,33 @@
     <div style="text-align:center;padding:60px;color:#888">Загрузка приглашения...</div>
   </div>
 
-  <!-- Music player -->
-  <div class="music-player hidden" id="music-player">
-    <span>🎵</span>
-    <span class="track-name" id="track-name">—</span>
-    <button onclick="prevTrack()">⏮</button>
-    <button onclick="togglePlay()" id="play-btn">▶</button>
-    <button onclick="nextTrack()">⏭</button>
-    <audio id="audio-el" preload="none"></audio>
+  <!-- Music FAB -->
+  <audio id="audio-el" preload="none"></audio>
+
+  <div id="music-fab-wrap" class="hidden">
+    <!-- FAB toggle button -->
+    <button id="music-fab-btn" onclick="toggleMusicWidget()" aria-label="Плеер">🎵</button>
+
+    <!-- Widget panel -->
+    <div id="music-widget" class="hidden">
+      <!-- Track list (scrollable, 4/5) -->
+      <div id="music-track-list"></div>
+
+      <!-- Controls bar (1/5) -->
+      <div id="music-controls">
+        <div id="music-current-name"></div>
+        <div id="music-progress-wrap">
+          <div id="music-progress-bar"><div id="music-progress-fill"></div></div>
+          <span id="music-time-cur">0:00</span>
+          <span id="music-time-dur">0:00</span>
+        </div>
+        <div id="music-btns">
+          <button onclick="prevTrack()">⏮</button>
+          <button id="play-btn" onclick="togglePlay()">▶</button>
+          <button onclick="nextTrack()">⏭</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <footer id="page-footer"><p>С любовью ❤️</p></footer>
@@ -109,33 +128,133 @@
     }
 
     // ──────────────────────────────────────────────
-    // MUSIC
+    // MUSIC FAB
     // ──────────────────────────────────────────────
     let tracks = [], trackIdx = 0, playing = false;
-    const audioEl      = document.getElementById('audio-el');
-    const playBtn      = document.getElementById('play-btn');
-    const trackNameEl  = document.getElementById('track-name');
+    const audioEl   = document.getElementById('audio-el');
+    const playBtn   = document.getElementById('play-btn');
+    const fabWrap   = document.getElementById('music-fab-wrap');
+    const widget    = document.getElementById('music-widget');
+    const trackList = document.getElementById('music-track-list');
+    const curName   = document.getElementById('music-current-name');
+    const progFill  = document.getElementById('music-progress-fill');
+    const timeCur   = document.getElementById('music-time-cur');
+    const timeDur   = document.getElementById('music-time-dur');
+
+    function fmtTime(s) {
+      if (!isFinite(s)) return '0:00';
+      const m = Math.floor(s / 60), ss = Math.floor(s % 60);
+      return m + ':' + String(ss).padStart(2, '0');
+    }
+
+    function parseTrackName(raw) {
+      const clean = raw.replace(/\.[^/.]+$/, ''); // strip extension
+      const sep = clean.indexOf(' - ');
+      if (sep > -1) return { title: clean.slice(sep + 3).trim(), artist: clean.slice(0, sep).trim() };
+      return { title: clean, artist: '' };
+    }
+
+    function getTrackMeta(t) {
+      // Prefer DB-stored ID3 tags; fall back to filename parsing
+      if (t.title) return { title: t.title, artist: t.artist || '' };
+      return parseTrackName(t.original_name || t.filename);
+    }
+
+    function renderTrackList() {
+      trackList.innerHTML = tracks.map((t, i) => {
+        const { title, artist } = getTrackMeta(t);
+        const active = i === trackIdx ? ' music-track-active' : '';
+        return `<div class="music-track-item${active}" onclick="loadTrack(${i});startPlay()">
+          <span class="music-track-num">${i + 1}</span>
+          <span class="music-track-text">
+            <span class="music-track-title">${title}</span>
+            ${artist ? `<span class="music-track-artist">${artist}</span>` : ''}
+          </span>
+        </div>`;
+      }).join('');
+    }
+
+    function updateControls() {
+      const t = tracks[trackIdx];
+      if (!t) return;
+      const meta = getTrackMeta(t);
+      curName.textContent = meta.title + (meta.artist ? ' — ' + meta.artist : '');
+      playBtn.textContent = playing ? '⏸' : '▶';
+      renderTrackList();
+      // Scroll active track into view
+      const active = trackList.querySelector('.music-track-active');
+      if (active) active.scrollIntoView({ block: 'nearest' });
+    }
 
     function loadTrack(idx) {
       if (!tracks.length) return;
       trackIdx = (idx + tracks.length) % tracks.length;
       audioEl.src = '/uploads/' + tracks[trackIdx].filename;
-      trackNameEl.textContent = tracks[trackIdx].original_name || tracks[trackIdx].filename;
       if (playing) audioEl.play();
+      updateControls();
     }
+
+    function startPlay() {
+      if (!tracks.length) return;
+      if (!audioEl.src || audioEl.src === window.location.href) loadTrack(0);
+      audioEl.play(); playing = true; updateControls();
+    }
+
     function togglePlay() {
       if (!tracks.length) return;
-      if (playing) { audioEl.pause(); playing = false; playBtn.textContent = '▶'; }
-      else { if (!audioEl.src || audioEl.src === window.location.href) loadTrack(0); audioEl.play(); playing = true; playBtn.textContent = '⏸'; }
+      if (playing) { audioEl.pause(); playing = false; updateControls(); }
+      else { startPlay(); }
     }
+
     function nextTrack() { loadTrack(trackIdx + 1); }
     function prevTrack() { loadTrack(trackIdx - 1); }
+
     audioEl.addEventListener('ended', () => loadTrack(trackIdx + 1));
+    audioEl.addEventListener('timeupdate', () => {
+      if (!audioEl.duration) return;
+      const pct = (audioEl.currentTime / audioEl.duration) * 100;
+      progFill.style.width = pct + '%';
+      timeCur.textContent  = fmtTime(audioEl.currentTime);
+      timeDur.textContent  = fmtTime(audioEl.duration);
+    });
+    // Click on progress bar to seek
+    document.getElementById('music-progress-bar').addEventListener('click', function(e) {
+      if (!audioEl.duration) return;
+      const rect = this.getBoundingClientRect();
+      audioEl.currentTime = ((e.clientX - rect.left) / rect.width) * audioEl.duration;
+    });
+
+    function toggleMusicWidget() {
+      widget.classList.toggle('hidden');
+    }
 
     async function initMusic() {
       try {
         tracks = await api.guestMusic();
-        if (tracks.length) { document.getElementById('music-player').classList.remove('hidden'); loadTrack(0); }
+        if (tracks.length) {
+          fabWrap.classList.remove('hidden');
+          loadTrack(0);
+          // Try autoplay; browsers may block it without prior user interaction.
+          // If blocked, pulse the FAB and play on first user gesture.
+          try {
+            await audioEl.play();
+            playing = true;
+            updateControls();
+            renderTrackList();
+          } catch (_) {
+            // Autoplay blocked — wait for first interaction
+            const fabBtn = document.getElementById('music-fab-btn');
+            fabBtn.classList.add('music-fab-pulse');
+            const resume = () => {
+              startPlay();
+              fabBtn.classList.remove('music-fab-pulse');
+              document.removeEventListener('click', resume);
+              document.removeEventListener('touchstart', resume);
+            };
+            document.addEventListener('click', resume, { once: true });
+            document.addEventListener('touchstart', resume, { once: true });
+          }
+        }
       } catch {}
     }
 
@@ -146,7 +265,14 @@
       if (canPress) {
         btn.onclick = () => { btn.textContent = '🎉 ТЫ ГОША!!!'; btn.style.background = '#27ae60'; btn.disabled = true; };
       } else {
+        // Capture natural position before switching to fixed, then clamp into viewport
+        const initR = btn.getBoundingClientRect();
+        const initLeft = Math.max(0, Math.min(window.innerWidth  - btn.offsetWidth,  initR.left));
+        const initTop  = Math.max(0, Math.min(window.innerHeight - btn.offsetHeight, initR.top));
         btn.style.position = 'fixed';
+        btn.style.left = initLeft + 'px';
+        btn.style.top  = initTop  + 'px';
+
         function flee(e) {
           const r  = btn.getBoundingClientRect();
           const mx = e.clientX || (e.touches && e.touches[0]?.clientX) || r.left + r.width/2;
@@ -247,6 +373,73 @@
       document.getElementById('gift-photo-img').src = '';
     }
 
+    // ──────────────────────────────────────────────
+    // SECTION PHOTO ACCORDION GALLERY
+    // ──────────────────────────────────────────────
+    const _sgState  = {};  // sectionId → active index
+    const _sgPhotos = {};  // sectionId → [{filename}]
+
+    function buildSectionGallery(s) {
+      _sgPhotos[s.id] = s.photos;
+      if (!(s.id in _sgState)) _sgState[s.id] = 0;
+      const idx  = _sgState[s.id];
+      const cur  = s.photos[idx];
+      const many = s.photos.length > 1;
+
+      const thumbs = many ? s.photos.map((p, i) => `
+        <div class="section-gallery-thumb ${i === idx ? 'active' : ''}"
+             onclick="sgSetPhoto(${s.id},${i})">
+          <img src="/uploads/${p.filename}" alt="" loading="lazy">
+        </div>`).join('') : '';
+
+      return `
+        <div class="section-gallery" id="sg-${s.id}">
+          <button class="section-gallery-toggle" onclick="sgToggle(${s.id})">
+            📷 Фотографии (${s.photos.length})
+            <span id="sg-arrow-${s.id}">▾</span>
+          </button>
+          <div class="section-gallery-body" id="sg-body-${s.id}" style="display:none">
+            <div class="section-gallery-main">
+              ${many ? `<button class="section-gallery-nav prev" onclick="sgPrev(${s.id})">&#8249;</button>` : ''}
+              <img id="sg-img-${s.id}" src="/uploads/${cur.filename}" alt="" loading="lazy">
+              <button class="section-gallery-zoom" onclick="openGiftPhoto('/uploads/${cur.filename}')"
+                      id="sg-zoom-${s.id}">🔍</button>
+              ${many ? `<button class="section-gallery-nav next" onclick="sgNext(${s.id})">&#8250;</button>` : ''}
+            </div>
+            ${many ? `<div class="section-gallery-thumbs">${thumbs}</div>` : ''}
+          </div>
+        </div>`;
+    }
+
+    function sgToggle(id) {
+      const body  = document.getElementById(`sg-body-${id}`);
+      const arrow = document.getElementById(`sg-arrow-${id}`);
+      const open  = body.style.display === 'none';
+      body.style.display = open ? '' : 'none';
+      arrow.textContent  = open ? '▴' : '▾';
+    }
+
+    function sgSetPhoto(sId, idx) {
+      _sgState[sId] = idx;
+      const photos = _sgPhotos[sId] || [];
+      const src    = '/uploads/' + photos[idx].filename;
+      const img    = document.getElementById(`sg-img-${sId}`);
+      const zoom   = document.getElementById(`sg-zoom-${sId}`);
+      if (img)  { img.style.opacity = '.4'; img.src = src; img.onload = () => img.style.opacity = '1'; }
+      if (zoom) { zoom.onclick = () => openGiftPhoto(src); }
+      document.querySelectorAll(`#sg-body-${sId} .section-gallery-thumb`).forEach((t, i) =>
+        t.classList.toggle('active', i === idx));
+    }
+
+    function sgPrev(sId) {
+      const n = (_sgPhotos[sId] || []).length;
+      sgSetPhoto(sId, (_sgState[sId] - 1 + n) % n);
+    }
+    function sgNext(sId) {
+      const n = (_sgPhotos[sId] || []).length;
+      sgSetPhoto(sId, (_sgState[sId] + 1) % n);
+    }
+
     async function pickGift(id) {
       try { await api.pickGift(id); await reloadGifts(); } catch (e) { alert(e.message); }
     }
@@ -336,9 +529,7 @@
         if (s.title)  html += `<h2>${s.title}</h2>`;
         if (s.content) html += `<div>${renderContent(s.content, guests)}</div>`;
         if (s.photos && s.photos.length) {
-          html += `<div class="section-photos">`;
-          s.photos.forEach(p => { html += `<img src="/uploads/${p.filename}" alt="" loading="lazy">`; });
-          html += `</div>`;
+          html += buildSectionGallery(s);
         }
         html += `</div>`;
       }

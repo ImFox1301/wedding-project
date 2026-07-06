@@ -390,19 +390,21 @@ func GetMusic(c *gin.Context) {
 	db.DB.QueryRow(`SELECT role FROM guests WHERE id=$1`, guestID).Scan(&role)
 
 	rows, _ := db.DB.Query(
-		`SELECT id, filename, original_name FROM music_files WHERE role=$1 ORDER BY file_order, id`, role,
+		`SELECT id, filename, original_name, title, artist FROM music_files WHERE role=$1 ORDER BY file_order, id`, role,
 	)
 	type MusicRow struct {
 		ID           int    `json:"id"`
 		Filename     string `json:"filename"`
 		OriginalName string `json:"original_name"`
+		Title        string `json:"title"`
+		Artist       string `json:"artist"`
 	}
 	var music []MusicRow
 	if rows != nil {
 		defer rows.Close()
 		for rows.Next() {
 			var m MusicRow
-			rows.Scan(&m.ID, &m.Filename, &m.OriginalName)
+			rows.Scan(&m.ID, &m.Filename, &m.OriginalName, &m.Title, &m.Artist)
 			music = append(music, m)
 		}
 	}

@@ -79,6 +79,7 @@ func main() {
 		admin.GET("/sections", handlers.ListSections)
 		admin.POST("/sections", handlers.CreateSection)
 		admin.PUT("/sections/:id", handlers.UpdateSection)
+		admin.PUT("/sections/:id/order", handlers.UpdateSectionOrder)
 		admin.DELETE("/sections/:id", handlers.DeleteSection)
 		admin.POST("/sections/:id/photos", handlers.UploadSectionPhoto)
 		admin.DELETE("/sections/:id/photos/:photoId", handlers.DeleteSectionPhoto)

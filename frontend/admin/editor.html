@@ -11,80 +11,189 @@
     .ql-editor    { min-height: 220px; }
     .ql-toolbar   { border-radius: 4px 4px 0 0; }
     .ql-container { border-radius: 0 0 4px 4px; }
-
-    /* Responsive images inside the editor */
     .ql-editor img { max-width: 100%; height: auto; cursor: pointer; }
     .ql-editor img:hover { outline: 2px solid #6b6b6b; outline-offset: 2px; }
     .ql-editor img.img-selected { outline: 2px solid #3498db; outline-offset: 2px; }
-
-    /* Float clearing inside editor blocks */
     .ql-editor > *::after { content: ''; display: block; clear: both; }
 
-    .section-preview {
-      color: #666; font-size: .85rem; max-height: 50px; overflow: hidden;
-      white-space: nowrap; text-overflow: ellipsis; margin-bottom: 10px;
+    /* Section cards */
+    .section-card {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.05);
+      transition: box-shadow .15s, opacity .15s;
+      margin-bottom: 10px;
+    }
+    .section-card:hover { box-shadow: 0 3px 10px rgba(0,0,0,.09); }
+    .section-card.dragging  { opacity: .4; }
+    .section-card.drag-over { box-shadow: 0 0 0 2px #6b6b6b; }
+
+    .section-drag-handle {
+      color: #cbd5e1;
+      cursor: grab;
+      font-size: 18px;
+      flex-shrink: 0;
+      padding-top: 2px;
+      user-select: none;
+      line-height: 1;
+    }
+    .section-drag-handle:active { cursor: grabbing; }
+
+    .section-card-body { flex: 1; min-width: 0; }
+    .section-card-title {
+      font-weight: 600;
+      font-size: .95rem;
+      color: #1e293b;
+      margin-bottom: 4px;
+    }
+    .section-card-preview {
+      font-size: .8rem;
+      color: #64748b;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      margin-bottom: 10px;
+    }
+    .section-card-footer {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
     }
 
-    /* ── Alignment popup (appears after image file is chosen) ── */
+    /* ── Accordion gallery ── */
+    .gallery-accordion { margin-top: 10px; }
+    .gallery-toggle {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: none; border: 1px solid #e2e8f0; border-radius: 6px;
+      padding: 4px 12px; font-size: .8rem; color: #475569;
+      cursor: pointer; transition: background .12s;
+      font-family: inherit;
+    }
+    .gallery-toggle:hover { background: #f8fafc; }
+    .gallery-body { margin-top: 10px; }
+
+    /* Main image display */
+    .gallery-main-wrap {
+      position: relative; border-radius: 8px; overflow: hidden;
+      background: #111; display: flex;
+      align-items: center; justify-content: center;
+      max-height: 300px;
+    }
+    .gallery-main-img {
+      max-width: 100%; max-height: 300px;
+      object-fit: contain; display: block;
+      transition: opacity .2s;
+    }
+    .gallery-zoom-btn {
+      position: absolute; top: 8px; right: 8px;
+      background: rgba(0,0,0,.55); color: #fff;
+      border: none; border-radius: 50%;
+      width: 30px; height: 30px; cursor: pointer;
+      font-size: 14px; display: flex; align-items: center; justify-content: center;
+      transition: background .15s;
+    }
+    .gallery-zoom-btn:hover { background: rgba(0,0,0,.8); }
+    .gallery-nav {
+      position: absolute; top: 50%; transform: translateY(-50%);
+      background: rgba(0,0,0,.45); color: #fff;
+      border: none; border-radius: 50%; width: 34px; height: 34px;
+      font-size: 18px; cursor: pointer; display: flex;
+      align-items: center; justify-content: center;
+      transition: background .15s;
+    }
+    .gallery-nav:hover { background: rgba(0,0,0,.75); }
+    .gallery-nav.prev { left: 8px; }
+    .gallery-nav.next { right: 8px; }
+
+    /* Thumbnails strip */
+    .gallery-thumbs-strip { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+    .gallery-thumb-item {
+      position: relative; width: 56px; height: 56px;
+      border-radius: 6px; overflow: hidden; cursor: pointer; flex-shrink: 0;
+      border: 2px solid transparent; transition: border-color .15s;
+    }
+    .gallery-thumb-item:hover { border-color: #94a3b8; }
+    .gallery-thumb-item.active { border-color: #6b6b6b; }
+    .gallery-thumb-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .gallery-thumb-del {
+      position: absolute; top: 2px; right: 2px;
+      background: rgba(192,57,43,.85); color: #fff; border: none;
+      border-radius: 50%; width: 16px; height: 16px; font-size: 9px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      line-height: 1; opacity: 0; transition: opacity .15s;
+    }
+    .gallery-thumb-item:hover .gallery-thumb-del { opacity: 1; }
+
+    /* ── Fullscreen photo modal ── */
+    #photo-fullscreen-modal {
+      display: none; position: fixed; inset: 0; z-index: 3000;
+      background: rgba(0,0,0,.92);
+      align-items: center; justify-content: center;
+    }
+    #photo-fullscreen-modal.active { display: flex; }
+    #photo-fullscreen-img {
+      max-width: 92vw; max-height: 90vh;
+      object-fit: contain; border-radius: 4px;
+    }
+    #photo-fullscreen-close {
+      position: fixed; top: 16px; right: 20px;
+      background: rgba(255,255,255,.15); color: #fff;
+      border: none; border-radius: 50%; width: 36px; height: 36px;
+      font-size: 18px; cursor: pointer; display: flex;
+      align-items: center; justify-content: center;
+      transition: background .15s;
+    }
+    #photo-fullscreen-close:hover { background: rgba(255,255,255,.3); }
+
+    /* Alignment popup */
     #align-overlay {
-      display: none;
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,.55);
-      z-index: 2000;
-      align-items: center;
-      justify-content: center;
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.55); z-index: 2000;
+      align-items: center; justify-content: center;
     }
     #align-overlay.active { display: flex; }
     #align-box {
-      background: #fff;
-      border-radius: 8px;
-      padding: 24px;
-      max-width: 520px;
-      width: 90%;
+      background: #fff; border-radius: 8px; padding: 24px;
+      max-width: 520px; width: 90%;
       box-shadow: 0 8px 32px rgba(0,0,0,.2);
     }
     #align-box h3 { margin: 0 0 14px; font-size: 1rem; color: #333; }
     #align-preview-img {
-      display: block;
-      max-width: 100%; max-height: 180px;
-      margin: 0 auto 18px;
-      border: 1px solid #ddd; border-radius: 4px;
+      display: block; max-width: 100%; max-height: 180px;
+      margin: 0 auto 18px; border: 1px solid #ddd; border-radius: 4px;
     }
     .align-options { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
     .align-options button {
-      padding: 8px 14px;
-      border: 1px solid #ccc; border-radius: 4px;
-      background: #f8f8f8; cursor: pointer;
-      font-size: .85rem; font-family: Arial, sans-serif;
-      transition: background .15s, border-color .15s;
+      padding: 8px 14px; border: 1px solid #ccc; border-radius: 4px;
+      background: #f8f8f8; cursor: pointer; font-size: .85rem;
+      font-family: Arial, sans-serif; transition: background .15s, border-color .15s;
     }
     .align-options button:hover { background: #e8e8e8; border-color: #999; }
     .align-options button.active { background: #6b6b6b; color: #fff; border-color: #555; }
 
-    /* ── Image toolbar (appears on click of an existing image) ── */
+    /* Image toolbar */
     #img-toolbar {
-      display: none;
-      position: fixed;
-      z-index: 1500;
-      background: #fff;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      box-shadow: 0 2px 10px rgba(0,0,0,.15);
-      padding: 4px;
-      gap: 4px;
-      align-items: center;
+      display: none; position: fixed; z-index: 1500;
+      background: #fff; border: 1px solid #ccc; border-radius: 4px;
+      box-shadow: 0 2px 10px rgba(0,0,0,.15); padding: 4px;
+      gap: 4px; align-items: center;
     }
     #img-toolbar.visible { display: flex; }
     #img-toolbar button {
-      border: 1px solid #ddd; border-radius: 3px;
-      background: #f8f8f8; cursor: pointer;
-      padding: 4px 9px; font-size: .78rem;
-      font-family: Arial, sans-serif; white-space: nowrap;
-      transition: background .1s;
+      border: 1px solid #ddd; border-radius: 3px; background: #f8f8f8;
+      cursor: pointer; padding: 4px 9px; font-size: .78rem;
+      font-family: Arial, sans-serif; white-space: nowrap; transition: background .1s;
     }
     #img-toolbar button:hover  { background: #e8e8e8; }
     #img-toolbar button.active { background: #6b6b6b; color: #fff; border-color: #555; }
     #img-toolbar .tb-sep { width: 1px; height: 20px; background: #ddd; margin: 0 2px; }
+
   </style>
 </head>
 <body>
@@ -120,7 +229,6 @@
         <a href="/admin/settings.html">Настройках</a>.
       </p>
 
-      <!-- Role tabs -->
       <div class="flex gap-8 mb-16">
         <button class="btn btn-primary"   id="tab-friends" onclick="setRole('friends')">Страница для Друзей</button>
         <button class="btn btn-secondary" id="tab-family"  onclick="setRole('family')">Страница для Семьи</button>
@@ -137,7 +245,7 @@
 
   <footer><p>Панель администратора</p></footer>
 
-  <!-- ── Section Edit Modal ── -->
+  <!-- Section Edit Modal -->
   <div class="modal-overlay" id="section-modal">
     <div class="modal" style="max-width:740px">
       <div class="modal-header">
@@ -154,10 +262,6 @@
           <label>Текст</label>
           <div id="section-content-editor"></div>
         </div>
-        <div class="form-group">
-          <label>Порядок отображения</label>
-          <input type="number" class="form-control" id="section-order" value="0" style="width:100px">
-        </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeSectionModal()">Отмена</button>
           <button type="submit" class="btn btn-primary">Сохранить</button>
@@ -166,15 +270,15 @@
     </div>
   </div>
 
-  <!-- ── Alignment dialog (shown after selecting an image file) ── -->
+  <!-- Alignment dialog -->
   <div id="align-overlay">
     <div id="align-box">
       <h3>Выравнивание изображения</h3>
       <img id="align-preview-img" src="" alt="">
       <div class="align-options">
         <button data-align="full"   onclick="commitInsert('full')">↔ Во всю ширину</button>
-        <button data-align="left"   onclick="commitInsert('left')">⬅ Слева (обтекание текстом)</button>
-        <button data-align="right"  onclick="commitInsert('right')">Справа ➡ (обтекание текстом)</button>
+        <button data-align="left"   onclick="commitInsert('left')">⬅ Слева (обтекание)</button>
+        <button data-align="right"  onclick="commitInsert('right')">Справа ➡ (обтекание)</button>
         <button data-align="center" onclick="commitInsert('center')">⟷ По центру</button>
       </div>
       <div style="margin-top:16px;text-align:right">
@@ -183,7 +287,13 @@
     </div>
   </div>
 
-  <!-- ── Image alignment toolbar (click on image to show) ── -->
+  <!-- Fullscreen photo modal -->
+  <div id="photo-fullscreen-modal" onclick="closePhotoModal()">
+    <button id="photo-fullscreen-close" onclick="closePhotoModal()">✕</button>
+    <img id="photo-fullscreen-img" src="" alt="" onclick="event.stopPropagation()">
+  </div>
+
+  <!-- Image alignment toolbar -->
   <div id="img-toolbar">
     <button data-align="full"   onclick="setImgAlign('full')"   title="Во всю ширину">↔ Ширина</button>
     <button data-align="left"   onclick="setImgAlign('left')"   title="Слева, текст справа">⬅ Слева</button>
@@ -199,9 +309,6 @@
     requireAdmin();
     function logout() { clearAuth(); window.location.href = '/login.html'; }
 
-    // ──────────────────────────────────────────────
-    // ALIGN STYLES
-    // ──────────────────────────────────────────────
     const ALIGN_STYLES = {
       full:   'display:block;max-width:100%;height:auto;margin:8px 0;',
       left:   'float:left;max-width:45%;height:auto;margin:0 16px 12px 0;',
@@ -209,26 +316,18 @@
       center: 'display:block;max-width:75%;height:auto;margin:8px auto;',
     };
 
-    // ──────────────────────────────────────────────
-    // CUSTOM IMAGE BLOT — preserves style attribute
-    // ──────────────────────────────────────────────
+    // Custom image blot
     const BaseImage = Quill.import('formats/image');
-
     class StyledImage extends BaseImage {
       static create(value) {
-        // value can be a plain src string (paste/drop) or { src, style }
         const src   = typeof value === 'string' ? value : (value && value.src ? value.src : value);
         const style = typeof value === 'object' && value ? (value.style || ALIGN_STYLES.full) : ALIGN_STYLES.full;
         const node  = super.create(src);
         node.setAttribute('style', style);
         return node;
       }
-      static value(node) {
-        return { src: node.getAttribute('src'), style: node.getAttribute('style') || '' };
-      }
-      static formats(node) {
-        return { style: node.getAttribute('style') || '' };
-      }
+      static value(node) { return { src: node.getAttribute('src'), style: node.getAttribute('style') || '' }; }
+      static formats(node) { return { style: node.getAttribute('style') || '' }; }
       format(name, value) {
         if (name === 'style') this.domNode.setAttribute('style', value || '');
         else super.format(name, value);
@@ -238,9 +337,6 @@
     StyledImage.tagName  = 'IMG';
     Quill.register(StyledImage, true);
 
-    // ──────────────────────────────────────────────
-    // QUILL INIT
-    // ──────────────────────────────────────────────
     const quill = new Quill('#section-content-editor', {
       theme: 'snow',
       placeholder: 'Введите текст раздела. Используйте {{first_name}}, {{last_name}}, {{full_name}}…',
@@ -259,12 +355,8 @@
       },
     });
 
-    // ──────────────────────────────────────────────
-    // IMAGE INSERT FLOW
-    // ──────────────────────────────────────────────
-    let _pendingSrc = null;
-    let _pendingRange = null;
-
+    // Image insert flow
+    let _pendingSrc = null, _pendingRange = null;
     function imageUploadHandler() {
       const input = document.createElement('input');
       input.type = 'file'; input.accept = 'image/*';
@@ -276,9 +368,7 @@
         reader.onload = e => {
           _pendingSrc   = e.target.result;
           _pendingRange = quill.getSelection(true);
-          // Show alignment dialog
           document.getElementById('align-preview-img').src = _pendingSrc;
-          // Reset active state
           document.querySelectorAll('#align-box .align-options button').forEach(b => b.classList.remove('active'));
           document.querySelector('#align-box [data-align="full"]').classList.add('active');
           document.getElementById('align-overlay').classList.add('active');
@@ -286,7 +376,6 @@
         reader.readAsDataURL(file);
       };
     }
-
     function commitInsert(align) {
       document.getElementById('align-overlay').classList.remove('active');
       if (!_pendingSrc) return;
@@ -294,13 +383,10 @@
       quill.setSelection(_pendingRange.index + 1);
       _pendingSrc = null; _pendingRange = null;
     }
-
     function cancelInsert() {
       document.getElementById('align-overlay').classList.remove('active');
       _pendingSrc = null; _pendingRange = null;
     }
-
-    // Highlight active alignment button in dialog
     document.querySelectorAll('#align-box .align-options button').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('#align-box .align-options button').forEach(b => b.classList.remove('active'));
@@ -308,27 +394,16 @@
       });
     });
 
-    // ──────────────────────────────────────────────
-    // CLICK-ON-IMAGE TOOLBAR
-    // ──────────────────────────────────────────────
+    // Click-on-image toolbar
     let selectedImg = null;
     const imgToolbar = document.getElementById('img-toolbar');
-
     quill.root.addEventListener('click', e => {
-      if (e.target.tagName === 'IMG') {
-        selectImg(e.target);
-      } else {
-        deselectImg();
-      }
+      if (e.target.tagName === 'IMG') selectImg(e.target);
+      else deselectImg();
     });
-
-    // Close toolbar when clicking outside editor and toolbar
     document.addEventListener('click', e => {
-      if (!quill.root.contains(e.target) && !imgToolbar.contains(e.target)) {
-        deselectImg();
-      }
+      if (!quill.root.contains(e.target) && !imgToolbar.contains(e.target)) deselectImg();
     }, true);
-
     function selectImg(img) {
       if (selectedImg) selectedImg.classList.remove('img-selected');
       selectedImg = img;
@@ -337,44 +412,36 @@
       imgToolbar.classList.add('visible');
       updateToolbarActive();
     }
-
     function deselectImg() {
       if (selectedImg) selectedImg.classList.remove('img-selected');
       selectedImg = null;
       imgToolbar.classList.remove('visible');
     }
-
     function positionToolbar() {
       if (!selectedImg) return;
       const r = selectedImg.getBoundingClientRect();
       imgToolbar.style.top  = (r.bottom + window.scrollY + 6) + 'px';
       imgToolbar.style.left = (r.left   + window.scrollX)     + 'px';
     }
-
     function updateToolbarActive() {
       const style = (selectedImg && selectedImg.getAttribute('style')) || '';
       imgToolbar.querySelectorAll('button[data-align]').forEach(b => {
         b.classList.toggle('active', ALIGN_STYLES[b.dataset.align] === style);
       });
     }
-
     function setImgAlign(align) {
       if (!selectedImg) return;
       selectedImg.setAttribute('style', ALIGN_STYLES[align]);
       updateToolbarActive();
-      // Re-position after potential size change
       requestAnimationFrame(positionToolbar);
     }
-
     function removeSelectedImg() {
       if (!selectedImg) return;
       selectedImg.remove();
       deselectImg();
     }
 
-    // ──────────────────────────────────────────────
-    // SECTION MANAGEMENT
-    // ──────────────────────────────────────────────
+    // ── Section management ──────────────────────────────────────
     let currentRole = 'friends';
     let sections    = [];
 
@@ -400,6 +467,100 @@
       }
     }
 
+    // gallery state: sectionId → active photo index
+    const galleryState = {};
+    // photo data store: sectionId → [{id, filename}]
+    const sectionPhotos = {};
+
+    function buildGallery(s) {
+      if (!s.photos || !s.photos.length) return '';
+      sectionPhotos[s.id] = s.photos;
+      if (!(s.id in galleryState)) galleryState[s.id] = 0;
+      const idx = galleryState[s.id];
+      const cur = s.photos[idx];
+      const hasMany = s.photos.length > 1;
+
+      const thumbs = s.photos.map((p, i) => `
+        <div class="gallery-thumb-item ${i === idx ? 'active' : ''}"
+             onclick="setGalleryPhoto(${s.id}, ${i})">
+          <img src="/uploads/${p.filename}" alt="">
+          <button class="gallery-thumb-del"
+            onclick="event.stopPropagation();deletePhoto(${s.id}, ${p.id})"
+            title="Удалить">✕</button>
+        </div>`).join('');
+
+      return `
+        <div class="gallery-accordion">
+          <button class="gallery-toggle" id="gallery-toggle-${s.id}"
+                  onclick="toggleGallery(${s.id})">
+            <span>📷 ${s.photos.length} фото</span>
+            <span id="gallery-arrow-${s.id}">▾</span>
+          </button>
+          <div class="gallery-body" id="gallery-body-${s.id}" style="display:none">
+            <div class="gallery-main-wrap">
+              ${hasMany ? `<button class="gallery-nav prev" onclick="prevGallery(${s.id})">&#8249;</button>` : ''}
+              <img class="gallery-main-img" id="gallery-main-${s.id}"
+                   src="/uploads/${cur.filename}" alt="">
+              <button class="gallery-zoom-btn" id="gallery-zoom-${s.id}"
+                      onclick="openPhotoModal('/uploads/${cur.filename}')">🔍</button>
+              ${hasMany ? `<button class="gallery-nav next" onclick="nextGallery(${s.id})">&#8250;</button>` : ''}
+            </div>
+            ${hasMany ? `<div class="gallery-thumbs-strip">${thumbs}</div>` : ''}
+          </div>
+        </div>`;
+    }
+
+    function toggleGallery(id) {
+      const body  = document.getElementById(`gallery-body-${id}`);
+      const arrow = document.getElementById(`gallery-arrow-${id}`);
+      const open  = body.style.display === 'none';
+      body.style.display  = open ? '' : 'none';
+      arrow.textContent   = open ? '▴' : '▾';
+    }
+
+    function setGalleryPhoto(sectionId, idx) {
+      galleryState[sectionId] = idx;
+      const photos = sectionPhotos[sectionId];
+      if (!photos) return;
+      const cur = photos[idx];
+      // Main image
+      const mainImg = document.getElementById(`gallery-main-${sectionId}`);
+      if (mainImg) { mainImg.style.opacity = '.5'; mainImg.src = '/uploads/' + cur.filename; mainImg.onload = () => mainImg.style.opacity = '1'; }
+      // Zoom button
+      const zoomBtn = document.getElementById(`gallery-zoom-${sectionId}`);
+      if (zoomBtn) zoomBtn.onclick = () => openPhotoModal('/uploads/' + cur.filename);
+      // Thumbnails
+      document.querySelectorAll(`#gallery-body-${sectionId} .gallery-thumb-item`).forEach((t, i) =>
+        t.classList.toggle('active', i === idx));
+    }
+
+    function prevGallery(sectionId) {
+      const photos = sectionPhotos[sectionId] || [];
+      const cur = galleryState[sectionId] || 0;
+      setGalleryPhoto(sectionId, (cur - 1 + photos.length) % photos.length);
+    }
+
+    function nextGallery(sectionId) {
+      const photos = sectionPhotos[sectionId] || [];
+      const cur = galleryState[sectionId] || 0;
+      setGalleryPhoto(sectionId, (cur + 1) % photos.length);
+    }
+
+    function openPhotoModal(src) {
+      document.getElementById('photo-fullscreen-img').src = src;
+      document.getElementById('photo-fullscreen-modal').classList.add('active');
+    }
+
+    function closePhotoModal() {
+      document.getElementById('photo-fullscreen-modal').classList.remove('active');
+      document.getElementById('photo-fullscreen-img').src = '';
+    }
+
+    // Close on Escape
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closePhotoModal();
+    });
+
     function renderSections() {
       const el = document.getElementById('sections-list');
       if (!sections.length) {
@@ -407,30 +568,69 @@
         return;
       }
       el.innerHTML = sections.map(s => `
-        <div class="section-item">
-          <div class="section-item-header">
-            <span class="section-item-title">${s.title || '<em>Без заголовка</em>'}</span>
-            <span class="text-muted" style="font-size:0.8rem">Порядок: ${s.order}</span>
-            <button class="btn btn-secondary btn-sm" onclick="editSection(${s.id})">✏️ Редактировать</button>
-            <button class="btn btn-danger btn-sm" onclick="deleteSection(${s.id})">🗑</button>
-          </div>
-          <div class="section-preview">${stripHtml(s.content) || '(нет текста)'}</div>
-          <div>
-            <div class="photo-thumbs" id="photos-${s.id}">
-              ${s.photos.map(p => `
-                <div class="photo-thumb">
-                  <img src="/uploads/${p.filename}" alt="">
-                  <button class="photo-del" onclick="deletePhoto(${s.id}, ${p.id})" title="Удалить фото">✕</button>
-                </div>
-              `).join('')}
+        <div class="section-card" data-id="${s.id}" draggable="true">
+          <span class="section-drag-handle" title="Перетащить">⠿</span>
+          <div class="section-card-body">
+            <div class="section-card-title">${s.title || '<em style="color:#94a3b8">Без заголовка</em>'}</div>
+            <div class="section-card-preview">${stripHtml(s.content) || '(нет текста)'}</div>
+            ${buildGallery(s)}
+            <div class="section-card-footer" style="margin-top:10px">
+              <button class="btn btn-secondary btn-sm" onclick="editSection(${s.id})">✏️ Редактировать</button>
+              <label class="btn btn-secondary btn-sm" style="cursor:pointer">
+                📷 Добавить фото
+                <input type="file" accept="image/*" style="display:none" onchange="uploadPhoto(${s.id}, this)">
+              </label>
+              <button class="btn btn-danger btn-sm" onclick="deleteSection(${s.id})">🗑</button>
             </div>
-            <label class="btn btn-secondary btn-sm mt-8" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px">
-              📷 Добавить фото
-              <input type="file" accept="image/*" style="display:none" onchange="uploadPhoto(${s.id}, this)">
-            </label>
           </div>
-        </div>
-      `).join('');
+        </div>`).join('');
+
+      initDragDrop();
+    }
+
+    // ── Drag-and-drop for sections ──────────────────────────────
+    function initDragDrop() {
+      const list = document.getElementById('sections-list');
+      let dragSrc = null;
+
+      list.querySelectorAll('.section-card').forEach(card => {
+        card.addEventListener('dragstart', e => {
+          dragSrc = card;
+          card.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'move';
+        });
+        card.addEventListener('dragend', () => {
+          card.classList.remove('dragging');
+          list.querySelectorAll('.section-card').forEach(c => c.classList.remove('drag-over'));
+          dragSrc = null;
+        });
+        card.addEventListener('dragover', e => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          if (card !== dragSrc) {
+            list.querySelectorAll('.section-card').forEach(c => c.classList.remove('drag-over'));
+            card.classList.add('drag-over');
+          }
+        });
+        card.addEventListener('drop', async e => {
+          e.preventDefault();
+          if (!dragSrc || dragSrc === card) return;
+          card.classList.remove('drag-over');
+          const cards = [...list.querySelectorAll('.section-card')];
+          const fromIdx = cards.indexOf(dragSrc);
+          const toIdx   = cards.indexOf(card);
+          if (fromIdx < toIdx) card.after(dragSrc);
+          else card.before(dragSrc);
+          await saveSectionOrder(list);
+        });
+      });
+    }
+
+    async function saveSectionOrder(list) {
+      const cards = [...list.querySelectorAll('.section-card')];
+      await Promise.all(cards.map((c, i) =>
+        api.sections.order(parseInt(c.dataset.id), i)
+      ));
     }
 
     function addSection() {
@@ -438,7 +638,6 @@
       document.getElementById('section-id').value    = '';
       document.getElementById('section-title').value = '';
       quill.root.innerHTML = '';
-      document.getElementById('section-order').value = sections.length;
       document.getElementById('section-modal').classList.add('active');
       setTimeout(() => quill.focus(), 120);
     }
@@ -449,13 +648,8 @@
       document.getElementById('section-id').value    = s.id;
       document.getElementById('section-title').value = s.title;
       const content = s.content || '';
-      if (content.trim().startsWith('<')) {
-        quill.root.innerHTML = content;
-      } else {
-        // Legacy plain text → basic HTML
-        quill.root.innerHTML = content.split('\n').map(l => `<p>${l || '<br>'}</p>`).join('');
-      }
-      document.getElementById('section-order').value = s.order;
+      if (content.trim().startsWith('<')) quill.root.innerHTML = content;
+      else quill.root.innerHTML = content.split('\n').map(l => `<p>${l || '<br>'}</p>`).join('');
       document.getElementById('section-modal').classList.add('active');
       setTimeout(() => quill.focus(), 120);
     }
@@ -504,11 +698,13 @@
       e.preventDefault();
       const id          = document.getElementById('section-id').value;
       const contentHtml = quill.root.innerHTML === '<p><br></p>' ? '' : quill.root.innerHTML;
+      // Preserve existing order; new sections go to end
+      const currentOrder = id ? (sections.find(s => s.id == id)?.order ?? sections.length) : sections.length;
       const data = {
         role:    currentRole,
         title:   document.getElementById('section-title').value.trim(),
         content: contentHtml,
-        order:   parseInt(document.getElementById('section-order').value) || 0,
+        order:   currentOrder,
       };
       try {
         if (id) await api.sections.update(id, data);

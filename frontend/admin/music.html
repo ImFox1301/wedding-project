@@ -5,6 +5,79 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Музыка — Админ</title>
   <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .music-columns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      align-items: flex-start;
+    }
+    @media (max-width: 700px) { .music-columns { grid-template-columns: 1fr; } }
+
+    .track-card {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.04);
+      transition: box-shadow .15s, opacity .15s;
+      cursor: default;
+    }
+    .track-card.drag-over { box-shadow: 0 0 0 2px #6b6b6b; }
+    .track-card.dragging  { opacity: .4; }
+
+    .track-drag-handle {
+      color: #cbd5e1;
+      cursor: grab;
+      font-size: 16px;
+      flex-shrink: 0;
+      line-height: 1;
+      user-select: none;
+    }
+    .track-drag-handle:active { cursor: grabbing; }
+
+    .track-num {
+      min-width: 20px;
+      text-align: right;
+      font-size: .75rem;
+      color: #94a3b8;
+      flex-shrink: 0;
+    }
+
+    .track-icon {
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .track-info { flex: 1; min-width: 0; }
+    .track-title {
+      font-size: .88rem;
+      font-weight: 600;
+      color: #1e293b;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .track-artist {
+      font-size: .75rem;
+      color: rgba(0,0,0,.38);
+      margin-top: 1px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .track-list { display: flex; flex-direction: column; gap: 8px; }
+    .tracks-empty { color: #94a3b8; font-size: .88rem; padding: 16px 0; }
+
+    .section-title-label {
+      font-size: .7rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .08em; color: #94a3b8; margin: 0 0 10px;
+    }
+  </style>
 </head>
 <body>
   <header>
@@ -29,34 +102,31 @@
     </nav>
 
     <main class="content">
-      <h1>Музыка для страниц</h1>
+      <h1 class="mb-16">Музыка для страниц</h1>
       <div id="alert-container"></div>
-      <p class="text-muted mb-16">Треки будут воспроизводиться по очереди на странице-приглашении. Поддерживаются форматы: MP3, OGG, WAV, FLAC, M4A.</p>
+      <p class="text-muted mb-16">Перетащите треки чтобы изменить порядок. Поддерживаются форматы: MP3, OGG, WAV, FLAC, M4A.</p>
 
-      <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start">
-
-        <!-- Friends music -->
-        <div style="flex:1;min-width:300px">
+      <div class="music-columns">
+        <div>
           <div class="flex align-center justify-between mb-16">
-            <h2>🎵 Для друзей</h2>
-            <label class="btn btn-success btn-sm" style="cursor:pointer">
+            <p class="section-title-label" style="margin:0">🎵 Для друзей</p>
+            <label class="btn btn-primary btn-sm" style="cursor:pointer">
               + Загрузить
               <input type="file" accept="audio/*" style="display:none" onchange="uploadMusic('friends', this)">
             </label>
           </div>
-          <div id="friends-music"></div>
+          <div class="track-list" id="friends-list" data-role="friends"></div>
         </div>
 
-        <!-- Family music -->
-        <div style="flex:1;min-width:300px">
+        <div>
           <div class="flex align-center justify-between mb-16">
-            <h2>🎵 Для семьи</h2>
-            <label class="btn btn-success btn-sm" style="cursor:pointer">
+            <p class="section-title-label" style="margin:0">🎵 Для семьи</p>
+            <label class="btn btn-primary btn-sm" style="cursor:pointer">
               + Загрузить
               <input type="file" accept="audio/*" style="display:none" onchange="uploadMusic('family', this)">
             </label>
           </div>
-          <div id="family-music"></div>
+          <div class="track-list" id="family-list" data-role="family"></div>
         </div>
       </div>
     </main>
@@ -69,46 +139,109 @@
     requireAdmin();
     function logout() { clearAuth(); window.location.href = '/login.html'; }
 
+    let friendsTracks = [];
+    let familyTracks  = [];
+
+    function parseName(raw) {
+      const clean = (raw || '').replace(/\.[^/.]+$/, '');
+      const sep = clean.indexOf(' - ');
+      if (sep > -1) return { title: clean.slice(sep + 3).trim(), artist: clean.slice(0, sep).trim() };
+      return { title: clean, artist: '' };
+    }
+
+    function getTrackMeta(t) {
+      if (t.title) return { title: t.title, artist: t.artist || '' };
+      return parseName(t.original_name || t.filename);
+    }
+
     async function load() {
       try {
         const music = await api.music.list();
-        renderMusic('friends', music.filter(m => m.role === 'friends'));
-        renderMusic('family', music.filter(m => m.role === 'family'));
+        friendsTracks = music.filter(m => m.role === 'friends');
+        familyTracks  = music.filter(m => m.role === 'family');
+        renderList('friends-list', friendsTracks);
+        renderList('family-list',  familyTracks);
       } catch (err) {
         showAlert(document.getElementById('alert-container'), err.message, 'danger');
       }
     }
 
-    function renderMusic(role, tracks) {
-      const el = document.getElementById(role + '-music');
+    function renderList(containerId, tracks) {
+      const el = document.getElementById(containerId);
       if (!tracks.length) {
-        el.innerHTML = '<p class="text-muted">Нет треков</p>';
+        el.innerHTML = '<p class="tracks-empty">Нет треков</p>';
         return;
       }
-      el.innerHTML = `
-        <table>
-          <thead><tr><th>#</th><th>Название</th><th>Порядок</th><th></th></tr></thead>
-          <tbody>
-            ${tracks.map(t => `
-              <tr>
-                <td>${t.id}</td>
-                <td>🎵 ${t.original_name || t.filename}</td>
-                <td>
-                  <input type="number" value="${t.order}" style="width:60px;padding:2px 6px;border:1px solid #ccc;border-radius:4px"
-                    onchange="updateOrder(${t.id}, this.value)">
-                </td>
-                <td>
-                  <button class="btn btn-danger btn-sm" onclick="deleteMusic(${t.id}, '${escapeAttr(t.original_name)}')">🗑</button>
-                </td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      `;
+      el.innerHTML = tracks.map((t, i) => {
+        const { title, artist } = getTrackMeta(t);
+        return `
+          <div class="track-card" data-id="${t.id}" draggable="true">
+            <span class="track-drag-handle" title="Перетащить">⠿</span>
+            <span class="track-num">${i + 1}</span>
+            <span class="track-icon">🎵</span>
+            <div class="track-info">
+              <div class="track-title">${title}</div>
+              ${artist ? `<div class="track-artist">${artist}</div>` : ''}
+            </div>
+            <button class="btn btn-danger btn-sm" onclick="deleteMusic(${t.id}, '${(t.original_name || t.filename).replace(/'/g, "\\'")}')">🗑</button>
+          </div>`;
+      }).join('');
+
+      initDragDrop(el);
     }
 
-    function escapeAttr(str) {
-      return (str || '').replace(/'/g, "\\'");
+    // ── Drag-and-drop ──────────────────────────────────────────
+    function initDragDrop(list) {
+      let dragSrc = null;
+
+      list.querySelectorAll('.track-card').forEach(card => {
+        card.addEventListener('dragstart', e => {
+          dragSrc = card;
+          card.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'move';
+        });
+        card.addEventListener('dragend', () => {
+          card.classList.remove('dragging');
+          list.querySelectorAll('.track-card').forEach(c => c.classList.remove('drag-over'));
+          dragSrc = null;
+        });
+        card.addEventListener('dragover', e => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          if (card !== dragSrc) {
+            list.querySelectorAll('.track-card').forEach(c => c.classList.remove('drag-over'));
+            card.classList.add('drag-over');
+          }
+        });
+        card.addEventListener('drop', async e => {
+          e.preventDefault();
+          if (!dragSrc || dragSrc === card) return;
+          card.classList.remove('drag-over');
+
+          // Reorder in DOM
+          const cards = [...list.querySelectorAll('.track-card')];
+          const fromIdx = cards.indexOf(dragSrc);
+          const toIdx   = cards.indexOf(card);
+          if (fromIdx < toIdx) card.after(dragSrc);
+          else card.before(dragSrc);
+
+          // Update numbers and save order
+          await saveOrder(list);
+        });
+      });
+    }
+
+    async function saveOrder(list) {
+      const cards = [...list.querySelectorAll('.track-card')];
+      // Update displayed numbers
+      cards.forEach((c, i) => {
+        const numEl = c.querySelector('.track-num');
+        if (numEl) numEl.textContent = i + 1;
+      });
+      // Persist to backend
+      await Promise.all(cards.map((c, i) =>
+        api.music.order(parseInt(c.dataset.id), i)
+      ));
     }
 
     async function uploadMusic(role, input) {
@@ -132,14 +265,6 @@
         await api.music.delete(id);
         await load();
         showAlert(document.getElementById('alert-container'), 'Трек удалён');
-      } catch (err) {
-        showAlert(document.getElementById('alert-container'), err.message, 'danger');
-      }
-    }
-
-    async function updateOrder(id, order) {
-      try {
-        await api.music.order(id, parseInt(order));
       } catch (err) {
         showAlert(document.getElementById('alert-container'), err.message, 'danger');
       }

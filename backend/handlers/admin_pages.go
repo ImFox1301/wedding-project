@@ -134,6 +134,16 @@ func UpdateSection(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
+func UpdateSectionOrder(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+	var req struct {
+		Order int `json:"order"`
+	}
+	c.ShouldBindJSON(&req)
+	db.DB.Exec(`UPDATE page_sections SET section_order=$1 WHERE id=$2`, req.Order, id)
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
 func DeleteSection(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 	db.DB.Exec(`DELETE FROM page_sections WHERE id=$1`, id)

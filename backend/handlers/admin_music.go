@@ -15,7 +15,7 @@ import (
 
 func ListMusic(c *gin.Context) {
 	role := c.Query("role")
-	query := `SELECT id, role, filename, original_name, file_order FROM music_files`
+	query := `SELECT id, role, filename, original_name, file_order, title, artist FROM music_files`
 	args := []interface{}{}
 	if role != "" {
 		query += ` WHERE role=$1`
@@ -36,11 +36,13 @@ func ListMusic(c *gin.Context) {
 		Filename     string `json:"filename"`
 		OriginalName string `json:"original_name"`
 		Order        int    `json:"order"`
+		Title        string `json:"title"`
+		Artist       string `json:"artist"`
 	}
 	var music []MusicRow
 	for rows.Next() {
 		var m MusicRow
-		rows.Scan(&m.ID, &m.Role, &m.Filename, &m.OriginalName, &m.Order)
+		rows.Scan(&m.ID, &m.Role, &m.Filename, &m.OriginalName, &m.Order, &m.Title, &m.Artist)
 		music = append(music, m)
 	}
 	if music == nil {
@@ -80,12 +82,15 @@ func UploadMusic(c *gin.Context) {
 		}
 	}
 
+	// Read ID3 / metadata tags from the saved file
+	title, artist := ReadAudioTags(uploadPath)
+
 	var id int
 	db.DB.QueryRow(
-		`INSERT INTO music_files (role, filename, original_name) VALUES ($1,$2,$3) RETURNING id`,
-		role, filename, file.Filename,
+		`INSERT INTO music_files (role, filename, original_name, title, artist) VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+		role, filename, file.Filename, title, artist,
 	).Scan(&id)
-	c.JSON(http.StatusCreated, gin.H{"id": id, "filename": filename})
+	c.JSON(http.StatusCreated, gin.H{"id": id, "filename": filename, "title": title, "artist": artist})
 }
 
 func DeleteMusic(c *gin.Context) {

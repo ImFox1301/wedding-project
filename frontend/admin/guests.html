@@ -99,7 +99,7 @@
         <div class="form-row">
           <div class="form-group">
             <label>Роль *</label>
-            <select class="form-control" id="role" required>
+            <select class="form-control" id="role" required onchange="updateGroupAvailability()">
               <option value="friends">Друзья</option>
               <option value="family">Семья</option>
             </select>
@@ -152,6 +152,19 @@
   <script>
     requireAdmin();
     function logout() { clearAuth(); window.location.href = '/login.html'; }
+
+    // Disable group select when role is "friends"
+    function updateGroupAvailability() {
+      const isFriends = document.getElementById('role').value === 'friends';
+      const groupSel  = document.getElementById('group-id');
+      if (isFriends) {
+        groupSel.value    = '';
+        groupSel.disabled = true;
+      } else {
+        groupSel.disabled = false;
+      }
+      updateSalutationVisibility();
+    }
 
     // Show/hide custom salutation based on whether a group is selected
     function updateSalutationVisibility() {
@@ -235,7 +248,7 @@
       document.getElementById('gender').value = guest ? (guest.gender || 'male') : 'male';
       document.getElementById('custom-salutation').value = guest ? (guest.custom_salutation || '') : '';
       document.getElementById('group-id').value = guest && guest.group_id ? guest.group_id : '';
-      updateSalutationVisibility();
+      updateGroupAvailability(); // sets disabled state and calls updateSalutationVisibility
       document.getElementById('am-i-gosha').checked = guest ? guest.am_i_gosha : false;
       document.getElementById('modal').classList.add('active');
     }
