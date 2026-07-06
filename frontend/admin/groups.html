@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Группы — Админ</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <a class="logo" href="/admin/">💍 Свадьба — Админ</a>
+    <div class="user-info"><button class="btn-logout" onclick="logout()">Выйти</button></div>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar">
+      <div class="sidebar-section">Гости</div>
+      <a href="/admin/guests.html">Гости</a>
+      <a href="/admin/groups.html" class="active">Группы</a>
+      <a href="/admin/links.html">Ссылки-приглашения</a>
+      <div class="sidebar-section">Контент</div>
+      <a href="/admin/editor.html">Редактор страниц</a>
+      <a href="/admin/gifts.html">Подарки</a>
+      <a href="/admin/music.html">Музыка</a>
+      <div class="sidebar-section">Аналитика</div>
+      <a href="/admin/stats.html">Статистика</a>
+      <div class="sidebar-section">Прочее</div>
+      <a href="/admin/settings.html">Настройки</a>
+    </nav>
+
+    <main class="content">
+      <div class="flex align-center justify-between mb-16">
+        <h1>Группы гостей</h1>
+        <button class="btn btn-primary" onclick="openModal()">+ Создать группу</button>
+      </div>
+      <div id="alert-container"></div>
+      <p class="text-muted mb-16">Группы позволяют объединить гостей для одного общего приглашения (например, семья).</p>
+
+      <div id="groups-list"></div>
+    </main>
+  </div>
+
+  <footer><p>Панель администратора</p></footer>
+
+  <!-- Modal: Create/Edit Group -->
+  <div class="modal-overlay" id="modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="modal-title">Создать группу</h2>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <form id="group-form">
+        <input type="hidden" id="group-id">
+        <div class="form-group">
+          <label>Название группы *</label>
+          <input type="text" class="form-control" id="group-name" required>
+        </div>
+        <div class="form-group">
+          <label>Участники группы</label>
+          <div id="members-list" style="max-height:280px;overflow-y:auto;border:1px solid #ddd;border-radius:4px;padding:8px"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Отмена</button>
+          <button type="submit" class="btn btn-primary">Сохранить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    requireAdmin();
+    function logout() { clearAuth(); window.location.href = '/login.html'; }
+
+    let allGuests = [];
+
+    async function load() {
+      try {
+        const [groups, guests] = await Promise.all([api.groups.list(), api.guests.list()]);
+        allGuests = guests;
+        renderGroups(groups);
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    }
+
+    function renderGroups(groups) {
+      const el = document.getElementById('groups-list');
+      if (!groups.length) {
+        el.innerHTML = '<p class="text-muted">Групп нет. Создайте первую группу.</p>';
+        return;
+      }
+      el.innerHTML = groups.map(g => `
+        <div class="card mb-16">
+          <div class="card-header">
+            <h3>📁 ${g.name}</h3>
+            <div class="flex gap-8">
+              <button class="btn btn-secondary btn-sm" onclick="editGroup(${g.id})">✏️ Редактировать</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteGroup(${g.id}, '${g.name}')">🗑 Удалить</button>
+            </div>
+          </div>
+          <div>
+            ${g.members.length
+              ? g.members.map(m => `<span class="badge badge-friends" style="margin:2px">${m.full_name}</span>`).join('')
+              : '<span class="text-muted">Нет участников</span>'}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function openModal(group = null) {
+      document.getElementById('modal-title').textContent = group ? 'Редактировать группу' : 'Создать группу';
+      document.getElementById('group-id').value = group ? group.id : '';
+      document.getElementById('group-name').value = group ? group.name : '';
+
+      const memberIds = group ? group.members.map(m => m.id) : [];
+      const membersList = document.getElementById('members-list');
+
+      function renderMembers() {
+        // First render: no checkboxes in DOM yet → use memberIds as initial state.
+        // Subsequent renders: read state from DOM to respect user changes.
+        const hasDOM = membersList.querySelectorAll('input[name="member"]').length > 0;
+        const checked = hasDOM
+          ? [...membersList.querySelectorAll('input[name="member"]:checked')].map(e => parseInt(e.value))
+          : memberIds;
+
+        membersList.innerHTML = allGuests.filter(g => g.role === 'family').map(g => {
+          const isChecked = checked.includes(g.id);
+          return `
+            <label class="checkbox-label" style="padding:4px 0;border-bottom:1px solid #f0f0f0">
+              <input type="checkbox" name="member" value="${g.id}" ${isChecked ? 'checked' : ''}>
+              <span>${g.last_name} ${g.first_name} ${g.middle_name || ''}</span>
+            </label>
+          `;
+        }).join('') || `<p class="text-muted" style="font-size:0.85rem">Нет гостей с ролью «Семья»</p>`;
+
+        // Re-wire change listeners after each re-render
+        membersList.querySelectorAll('input[name="member"]').forEach(cb => {
+          cb.addEventListener('change', renderMembers);
+        });
+      }
+
+      renderMembers();
+
+      document.getElementById('modal').classList.add('active');
+    }
+
+    function closeModal() {
+      document.getElementById('modal').classList.remove('active');
+    }
+
+    async function editGroup(id) {
+      try {
+        const g = await api.groups.get(id);
+        openModal(g);
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    }
+
+    async function deleteGroup(id, name) {
+      if (!confirmDialog(`Удалить группу «${name}»?`)) return;
+      try {
+        await api.groups.delete(id);
+        await load();
+        showAlert(document.getElementById('alert-container'), 'Группа удалена');
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    }
+
+    document.getElementById('group-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('group-id').value;
+      const name = document.getElementById('group-name').value.trim();
+      const members = [...document.querySelectorAll('input[name="member"]:checked')].map(el => parseInt(el.value));
+      try {
+        if (id) {
+          await api.groups.update(id, { name, members });
+        } else {
+          const res = await api.groups.create({ name });
+          await api.groups.update(res.id, { name, members });
+        }
+        closeModal();
+        await load();
+        showAlert(document.getElementById('alert-container'), id ? 'Группа обновлена' : 'Группа создана');
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    });
+
+    load();
+  </script>
+</body>
+</html>

@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ссылки-приглашения — Админ</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <a class="logo" href="/admin/">💍 Свадьба — Админ</a>
+    <div class="user-info"><button class="btn-logout" onclick="logout()">Выйти</button></div>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar">
+      <div class="sidebar-section">Гости</div>
+      <a href="/admin/guests.html">Гости</a>
+      <a href="/admin/groups.html">Группы</a>
+      <a href="/admin/links.html" class="active">Ссылки-приглашения</a>
+      <div class="sidebar-section">Контент</div>
+      <a href="/admin/editor.html">Редактор страниц</a>
+      <a href="/admin/gifts.html">Подарки</a>
+      <a href="/admin/music.html">Музыка</a>
+      <div class="sidebar-section">Аналитика</div>
+      <a href="/admin/stats.html">Статистика</a>
+      <div class="sidebar-section">Прочее</div>
+      <a href="/admin/settings.html">Настройки</a>
+    </nav>
+
+    <main class="content">
+      <div class="flex align-center justify-between mb-16">
+        <h1>Ссылки-приглашения</h1>
+        <button class="btn btn-primary" onclick="openModal()">+ Создать ссылку</button>
+      </div>
+      <div id="alert-container"></div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Тип</th>
+              <th>Гость / Группа</th>
+              <th>Ссылка</th>
+              <th>Создана</th>
+              <th>Действия</th>
+            </tr>
+          </thead>
+          <tbody id="links-tbody"></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <footer><p>Панель администратора</p></footer>
+
+  <!-- Modal -->
+  <div class="modal-overlay" id="modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Создать ссылку-приглашение</h2>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <form id="link-form">
+        <div class="form-group">
+          <label>Тип ссылки</label>
+          <select class="form-control" id="link-type" onchange="onTypeChange()">
+            <option value="guest">Для одного гостя</option>
+            <option value="group">Для группы</option>
+          </select>
+        </div>
+        <div class="form-group" id="guest-select-wrap">
+          <label>Гость</label>
+          <select class="form-control" id="link-guest"></select>
+        </div>
+        <div class="form-group hidden" id="group-select-wrap">
+          <label>Группа</label>
+          <select class="form-control" id="link-group"></select>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Отмена</button>
+          <button type="submit" class="btn btn-primary">Создать</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    requireAdmin();
+    function logout() { clearAuth(); window.location.href = '/login.html'; }
+
+    let allGuests = [], allGroups = [];
+
+    function getBase() {
+      return window.location.origin;
+    }
+
+    async function load() {
+      try {
+        const [available, links] = await Promise.all([
+          api.links.available(),
+          api.links.list(),
+        ]);
+        allGuests = available.guests;
+        allGroups = available.groups;
+        fillSelects(available);
+        renderLinks(links);
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    }
+
+    function fillSelects(available) {
+      const guestSel = document.getElementById('link-guest');
+      guestSel.innerHTML = available.guests.length
+        ? available.guests.map(g =>
+            `<option value="${g.id}">${g.last_name} ${g.first_name} (${g.role === 'friends' ? 'Друзья' : 'Семья'})</option>`
+          ).join('')
+        : '<option disabled>Нет доступных гостей</option>';
+
+      const groupSel = document.getElementById('link-group');
+      groupSel.innerHTML = available.groups.length
+        ? available.groups.map(g => `<option value="${g.id}">${g.name}</option>`).join('')
+        : '<option disabled>Нет доступных групп</option>';
+    }
+
+    function onTypeChange() {
+      const type = document.getElementById('link-type').value;
+      document.getElementById('guest-select-wrap').classList.toggle('hidden', type !== 'guest');
+      document.getElementById('group-select-wrap').classList.toggle('hidden', type !== 'group');
+    }
+
+    function renderLinks(links) {
+      const tbody = document.getElementById('links-tbody');
+      tbody.innerHTML = links.map(l => {
+        const url = `${getBase()}/invite.html?token=${l.token}`;
+        const type = l.guest_id ? 'Гость' : 'Группа';
+        let name = '—';
+        if (l.last_name) name = `${l.last_name} ${l.first_name}${l.middle_name ? ' ' + l.middle_name : ''}`;
+        else if (l.group_name) name = l.group_name;
+
+        return `
+          <tr>
+            <td>${l.id}</td>
+            <td>${type}</td>
+            <td>${name}</td>
+            <td>
+              <div class="link-copy">
+                <span>${url}</span>
+                <button onclick="copyLink('${url}')">Копировать</button>
+              </div>
+            </td>
+            <td>${new Date(l.created_at).toLocaleDateString('ru')}</td>
+            <td>
+              <button class="btn btn-danger btn-sm" onclick="deleteLink(${l.id})">🗑</button>
+            </td>
+          </tr>
+        `;
+      }).join('') || '<tr><td colspan="6" class="text-muted" style="padding:16px;text-align:center">Ссылок нет</td></tr>';
+    }
+
+    function copyLink(url) {
+      navigator.clipboard.writeText(url).then(() => {
+        showAlert(document.getElementById('alert-container'), 'Ссылка скопирована!');
+      });
+    }
+
+    function openModal() {
+      document.getElementById('modal').classList.add('active');
+      onTypeChange();
+    }
+
+    function closeModal() {
+      document.getElementById('modal').classList.remove('active');
+    }
+
+    async function deleteLink(id) {
+      if (!confirmDialog('Удалить ссылку?')) return;
+      try {
+        await api.links.delete(id);
+        const links = await api.links.list();
+        renderLinks(links);
+        showAlert(document.getElementById('alert-container'), 'Ссылка удалена');
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    }
+
+    document.getElementById('link-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const type = document.getElementById('link-type').value;
+      const data = type === 'guest'
+        ? { guest_id: parseInt(document.getElementById('link-guest').value) }
+        : { group_id: parseInt(document.getElementById('link-group').value) };
+      try {
+        await api.links.create(data);
+        closeModal();
+        const links = await api.links.list();
+        renderLinks(links);
+        showAlert(document.getElementById('alert-container'), 'Ссылка создана');
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    });
+
+    load();
+  </script>
+</body>
+</html>

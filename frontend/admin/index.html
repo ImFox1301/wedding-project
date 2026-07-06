@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Дашборд — Админ</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <a class="logo" href="/admin/">💍 Свадьба — Админ</a>
+    <div class="user-info">
+      <span id="admin-name">Администратор</span>
+      <button class="btn-logout" onclick="logout()">Выйти</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar">
+      <div class="sidebar-section">Гости</div>
+      <a href="/admin/guests.html">Гости</a>
+      <a href="/admin/groups.html">Группы</a>
+      <a href="/admin/links.html">Ссылки-приглашения</a>
+      <div class="sidebar-section">Контент</div>
+      <a href="/admin/editor.html">Редактор страниц</a>
+      <a href="/admin/gifts.html">Подарки</a>
+      <a href="/admin/music.html">Музыка</a>
+      <div class="sidebar-section">Аналитика</div>
+      <a href="/admin/stats.html">Статистика</a>
+      <div class="sidebar-section">Прочее</div>
+      <a href="/admin/settings.html">Настройки</a>
+    </nav>
+
+    <main class="content">
+      <h1>Дашборд</h1>
+      <div id="alert-container"></div>
+
+      <div class="stats-grid" id="overview-stats">
+        <div class="stat-card">
+          <div class="stat-number" id="stat-guests">—</div>
+          <div class="stat-label">Всего гостей</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="stat-visited">—</div>
+          <div class="stat-label">Открыли приглашение</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="stat-friends">—</div>
+          <div class="stat-label">Друзей</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="stat-family">—</div>
+          <div class="stat-label">Родственников</div>
+        </div>
+      </div>
+
+      <div class="card mt-16">
+        <div class="card-header"><h2>Последние посещения</h2></div>
+        <div class="table-wrap">
+          <table id="visit-table">
+            <thead>
+              <tr>
+                <th>Гость</th>
+                <th>Роль</th>
+                <th>Статус</th>
+                <th>Время посещения</th>
+              </tr>
+            </thead>
+            <tbody id="visit-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <footer><p>Панель администратора</p></footer>
+
+  <script src="/js/api.js"></script>
+  <script>
+    requireAdmin();
+
+    function logout() {
+      clearAuth();
+      window.location.href = '/login.html';
+    }
+
+    async function load() {
+      try {
+        const [guests, visits] = await Promise.all([
+          api.guests.list(),
+          api.stats.visits(),
+        ]);
+
+        const total = guests.length;
+        const visited = guests.filter(g => g.visited).length;
+        const friends = guests.filter(g => g.role === 'friends').length;
+        const family = guests.filter(g => g.role === 'family').length;
+
+        document.getElementById('stat-guests').textContent = total;
+        document.getElementById('stat-visited').textContent = visited;
+        document.getElementById('stat-friends').textContent = friends;
+        document.getElementById('stat-family').textContent = family;
+
+        const tbody = document.getElementById('visit-tbody');
+        const recent = visits.filter(v => v.visited).slice(0, 20);
+        tbody.innerHTML = recent.length ? recent.map(v => `
+          <tr>
+            <td>${v.last_name} ${v.first_name}</td>
+            <td><span class="badge badge-${v.role}">${v.role === 'friends' ? 'Друзья' : 'Семья'}</span></td>
+            <td><span class="badge badge-visited">Посетил</span></td>
+            <td>${v.visited_at ? new Date(v.visited_at).toLocaleString('ru') : '—'}</td>
+          </tr>
+        `).join('') : '<tr><td colspan="4" class="text-muted" style="padding:16px;text-align:center">Никто ещё не открывал приглашения</td></tr>';
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>

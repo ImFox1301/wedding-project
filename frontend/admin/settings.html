@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Настройки — Админ</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <a class="logo" href="/admin/">💍 Свадьба — Админ</a>
+    <div class="user-info"><button class="btn-logout" onclick="logout()">Выйти</button></div>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar">
+      <div class="sidebar-section">Гости</div>
+      <a href="/admin/guests.html">Гости</a>
+      <a href="/admin/groups.html">Группы</a>
+      <a href="/admin/links.html">Ссылки-приглашения</a>
+      <div class="sidebar-section">Контент</div>
+      <a href="/admin/editor.html">Редактор страниц</a>
+      <a href="/admin/gifts.html">Подарки</a>
+      <a href="/admin/music.html">Музыка</a>
+      <div class="sidebar-section">Аналитика</div>
+      <a href="/admin/stats.html">Статистика</a>
+      <div class="sidebar-section">Прочее</div>
+      <a href="/admin/settings.html" class="active">Настройки</a>
+    </nav>
+
+    <main class="content">
+      <h1>Настройки</h1>
+      <div id="alert-container"></div>
+
+      <!-- Header / Footer text -->
+      <div class="card mb-16">
+        <div class="card-header"><h2>🖼 Шапка и подвал страницы-приглашения</h2></div>
+        <p class="text-muted mb-16">Текст в навигационной строке и в нижней части страницы для гостей.</p>
+        <form id="header-footer-form">
+          <div class="form-group">
+            <label>Текст шапки (хедер)</label>
+            <input type="text" class="form-control" id="header-text"
+              placeholder="💍 Свадьба">
+          </div>
+          <div class="form-group">
+            <label>Текст подвала (футер)</label>
+            <input type="text" class="form-control" id="footer-text"
+              placeholder="С любовью ❤️">
+          </div>
+          <button type="submit" class="btn btn-primary">Сохранить</button>
+        </form>
+      </div>
+
+      <!-- Subtitle settings -->
+      <div class="card mb-16">
+        <div class="card-header"><h2>📝 Подзаголовок страниц-приглашений</h2></div>
+        <p class="text-muted mb-16">Текст под именем гостя на странице приглашения.</p>
+        <form id="subtitle-form">
+          <div class="form-group">
+            <label>Для друзей</label>
+            <input type="text" class="form-control" id="subtitle-friends"
+              placeholder="Вы приглашены на нашу свадьбу 💍">
+          </div>
+          <div class="form-group">
+            <label>Для семьи</label>
+            <input type="text" class="form-control" id="subtitle-family"
+              placeholder="Вы приглашены на нашу свадьбу 💍">
+          </div>
+          <button type="submit" class="btn btn-primary">Сохранить</button>
+        </form>
+      </div>
+
+      <!-- Cottage date range -->
+      <div class="card mb-16">
+        <div class="card-header"><h2>🏡 Коттедж — допустимый период пребывания</h2></div>
+        <p class="text-muted mb-16">Задайте диапазон дат. Дата заезда фиксируется для гостей; гость выбирает только дату выезда в этом диапазоне.</p>
+
+        <div id="cottage-picker"></div>
+
+        <div class="mt-16 flex gap-16 align-center">
+          <div>
+            <span class="text-muted">Выбранный период: </span>
+            <strong id="range-display">не задан</strong>
+          </div>
+          <button class="btn btn-primary" onclick="saveCottage()">Сохранить период</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <footer><p>Панель администратора</p></footer>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/daterange.js"></script>
+  <script>
+    requireAdmin();
+    function logout() { clearAuth(); window.location.href = '/login.html'; }
+
+    let cottageFrom = '', cottageTo = '';
+    let picker;
+
+    async function load() {
+      try {
+        const s = await api.settings.get();
+
+        document.getElementById('header-text').value         = s['header_text']            || '';
+        document.getElementById('footer-text').value         = s['footer_text']            || '';
+        document.getElementById('subtitle-friends').value    = s['page_subtitle_friends']  || '';
+        document.getElementById('subtitle-family').value     = s['page_subtitle_family']   || '';
+
+        cottageFrom = s['cottage_date_from'] || '';
+        cottageTo   = s['cottage_date_to']   || '';
+
+        picker = new DateRangePicker(document.getElementById('cottage-picker'), {
+          from:      cottageFrom,
+          to:        cottageTo,
+          labelFrom: 'Начало периода',
+          labelTo:   'Конец периода',
+          onChange:  (from, to) => {
+            cottageFrom = from;
+            cottageTo   = to;
+            updateRangeDisplay();
+          },
+        });
+        updateRangeDisplay();
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    }
+
+    function updateRangeDisplay() {
+      document.getElementById('range-display').textContent =
+        cottageFrom && cottageTo ? `${cottageFrom} — ${cottageTo}` : 'не задан';
+    }
+
+    // Header / Footer
+    document.getElementById('header-footer-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        await api.settings.update({
+          header_text: document.getElementById('header-text').value.trim(),
+          footer_text: document.getElementById('footer-text').value.trim(),
+        });
+        showAlert(document.getElementById('alert-container'), 'Шапка и подвал сохранены');
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    });
+
+    // Subtitles
+    document.getElementById('subtitle-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        await api.settings.update({
+          page_subtitle_friends: document.getElementById('subtitle-friends').value.trim(),
+          page_subtitle_family:  document.getElementById('subtitle-family').value.trim(),
+        });
+        showAlert(document.getElementById('alert-container'), 'Подзаголовки сохранены');
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    });
+
+    async function saveCottage() {
+      try {
+        await api.settings.update({
+          cottage_date_from: cottageFrom,
+          cottage_date_to:   cottageTo,
+        });
+        showAlert(document.getElementById('alert-container'), 'Период коттеджа сохранён');
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>

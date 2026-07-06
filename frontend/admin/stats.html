@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Статистика — Админ</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <a class="logo" href="/admin/">💍 Свадьба — Админ</a>
+    <div class="user-info"><button class="btn-logout" onclick="logout()">Выйти</button></div>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar">
+      <div class="sidebar-section">Гости</div>
+      <a href="/admin/guests.html">Гости</a>
+      <a href="/admin/groups.html">Группы</a>
+      <a href="/admin/links.html">Ссылки-приглашения</a>
+      <div class="sidebar-section">Контент</div>
+      <a href="/admin/editor.html">Редактор страниц</a>
+      <a href="/admin/gifts.html">Подарки</a>
+      <a href="/admin/music.html">Музыка</a>
+      <div class="sidebar-section">Аналитика</div>
+      <a href="/admin/stats.html" class="active">Статистика</a>
+      <div class="sidebar-section">Прочее</div>
+      <a href="/admin/settings.html">Настройки</a>
+    </nav>
+
+    <main class="content">
+      <h1>Статистика</h1>
+      <div id="alert-container"></div>
+
+      <!-- 1. Visits -->
+      <div class="card mb-16">
+        <div class="card-header"><h2>📊 Посещаемость приглашений</h2></div>
+        <div class="stats-grid" id="visit-summary"></div>
+        <div class="chart-bar-wrap" id="visit-chart"></div>
+      </div>
+
+      <!-- 2. Cottage dates (2.5.1, 2.5.2) -->
+      <div class="card mb-16">
+        <div class="card-header"><h2>🏡 Коттедж — даты заезда</h2></div>
+        <div class="stats-grid" id="cottage-summary"></div>
+        <div class="chart-bar-wrap" id="cottage-chart"></div>
+        <div class="table-wrap mt-16">
+          <table id="cottage-table">
+            <thead><tr><th>Гость</th><th>Дата заезда</th><th>Дата выезда</th></tr></thead>
+            <tbody id="cottage-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 3. Tournament (2.5.3) -->
+      <div class="card mb-16">
+        <div class="card-header"><h2>🏆 Турнир</h2></div>
+        <div class="stats-grid" id="tourn-summary"></div>
+        <div class="table-wrap mt-16">
+          <table id="tourn-table">
+            <thead><tr><th>Участник</th><th>Желаемый соперник</th></tr></thead>
+            <tbody id="tourn-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 4. Loft (2.6.1, 2.6.2) -->
+      <div class="card">
+        <div class="card-header"><h2>🏙 Лофт</h2></div>
+        <div class="stats-grid" id="loft-summary"></div>
+        <div class="table-wrap mt-16">
+          <table id="loft-table">
+            <thead><tr><th>Гость</th><th>Едет в лофт</th><th>Нужен транспорт</th></tr></thead>
+            <tbody id="loft-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <footer><p>Панель администратора</p></footer>
+
+  <script src="/js/api.js"></script>
+  <script>
+    requireAdmin();
+    function logout() { clearAuth(); window.location.href = '/login.html'; }
+
+    function barChart(data, maxVal) {
+      return data.map(item => `
+        <div class="chart-bar-row">
+          <span class="chart-bar-label">${item.label}</span>
+          <div class="chart-bar-track">
+            <div class="chart-bar-fill" style="width:${maxVal ? Math.round(item.value / maxVal * 100) : 0}%"></div>
+          </div>
+          <span class="chart-bar-value">${item.value}</span>
+        </div>
+      `).join('');
+    }
+
+    async function load() {
+      try {
+        const [visits, cottage, tourn, loft] = await Promise.all([
+          api.stats.visits(),
+          api.stats.cottage(),
+          api.stats.tournament(),
+          api.stats.loft(),
+        ]);
+
+        // Visits
+        const visitedCount = visits.filter(v => v.visited).length;
+        const notVisited = visits.length - visitedCount;
+        document.getElementById('visit-summary').innerHTML = `
+          <div class="stat-card"><div class="stat-number">${visits.length}</div><div class="stat-label">Всего гостей</div></div>
+          <div class="stat-card"><div class="stat-number">${visitedCount}</div><div class="stat-label">Открыли приглашение</div></div>
+          <div class="stat-card"><div class="stat-number">${notVisited}</div><div class="stat-label">Не открывали</div></div>
+        `;
+        const visitChartData = [
+          { label: 'Друзья (открыли)', value: visits.filter(v => v.role === 'friends' && v.visited).length },
+          { label: 'Друзья (нет)', value: visits.filter(v => v.role === 'friends' && !v.visited).length },
+          { label: 'Семья (открыли)', value: visits.filter(v => v.role === 'family' && v.visited).length },
+          { label: 'Семья (нет)', value: visits.filter(v => v.role === 'family' && !v.visited).length },
+        ];
+        const maxVisit = Math.max(...visitChartData.map(d => d.value), 1);
+        document.getElementById('visit-chart').innerHTML = barChart(visitChartData, maxVisit);
+
+        // Cottage
+        const cottageCount = cottage.guest_dates.length;
+        document.getElementById('cottage-summary').innerHTML = `
+          <div class="stat-card"><div class="stat-number">${cottageCount}</div><div class="stat-label">Едут в коттедж</div></div>
+        `;
+        // Count by date
+        const dateCounts = {};
+        cottage.guest_dates.forEach(gd => {
+          const key = gd.date_from;
+          dateCounts[key] = (dateCounts[key] || 0) + 1;
+        });
+        const dateChartData = Object.entries(dateCounts).map(([date, count]) => ({ label: date, value: count }));
+        const maxDate = Math.max(...dateChartData.map(d => d.value), 1);
+        document.getElementById('cottage-chart').innerHTML = dateChartData.length
+          ? barChart(dateChartData, maxDate)
+          : '<p class="text-muted">Нет данных</p>';
+        document.getElementById('cottage-tbody').innerHTML = cottage.guest_dates.map(gd => `
+          <tr><td>${gd.last_name} ${gd.first_name}</td><td>${gd.date_from}</td><td>${gd.date_to}</td></tr>
+        `).join('') || '<tr><td colspan="3" class="text-muted">Нет данных</td></tr>';
+
+        // Tournament
+        document.getElementById('tourn-summary').innerHTML = `
+          <div class="stat-card"><div class="stat-number">${tourn.total}</div><div class="stat-label">Участвуют в турнире</div></div>
+        `;
+        document.getElementById('tourn-tbody').innerHTML = tourn.participants.map(p => `
+          <tr><td>${p.last_name} ${p.first_name}</td><td>${p.opponent_name || '—'}</td></tr>
+        `).join('') || '<tr><td colspan="2" class="text-muted">Нет данных</td></tr>';
+
+        // Loft
+        document.getElementById('loft-summary').innerHTML = `
+          <div class="stat-card"><div class="stat-number">${loft.going_count}</div><div class="stat-label">Едут в лофт</div></div>
+          <div class="stat-card"><div class="stat-number">${loft.transport_count}</div><div class="stat-label">Нужен транспорт</div></div>
+        `;
+        const loftChartData = [
+          { label: 'Едут в лофт', value: loft.going_count },
+          { label: 'Нужен транспорт', value: loft.transport_count },
+          { label: 'Не едут', value: loft.guests.length - loft.going_count },
+        ];
+        document.getElementById('loft-tbody').innerHTML = loft.guests.map(g => `
+          <tr>
+            <td>${g.last_name} ${g.first_name}</td>
+            <td>${g.going_loft ? '✅' : '—'}</td>
+            <td>${g.needs_transport ? '✅' : '—'}</td>
+          </tr>
+        `).join('') || '<tr><td colspan="3" class="text-muted">Нет данных</td></tr>';
+
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>

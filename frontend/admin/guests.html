@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Гости — Админ</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <a class="logo" href="/admin/">💍 Свадьба — Админ</a>
+    <div class="user-info">
+      <button class="btn-logout" onclick="logout()">Выйти</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar">
+      <div class="sidebar-section">Гости</div>
+      <a href="/admin/guests.html" class="active">Гости</a>
+      <a href="/admin/groups.html">Группы</a>
+      <a href="/admin/links.html">Ссылки-приглашения</a>
+      <div class="sidebar-section">Контент</div>
+      <a href="/admin/editor.html">Редактор страниц</a>
+      <a href="/admin/gifts.html">Подарки</a>
+      <a href="/admin/music.html">Музыка</a>
+      <div class="sidebar-section">Аналитика</div>
+      <a href="/admin/stats.html">Статистика</a>
+      <div class="sidebar-section">Прочее</div>
+      <a href="/admin/settings.html">Настройки</a>
+    </nav>
+
+    <main class="content">
+      <div class="flex align-center justify-between mb-16">
+        <h1>Гости</h1>
+        <button class="btn btn-primary" onclick="openModal()">+ Добавить гостя</button>
+      </div>
+      <div id="alert-container"></div>
+
+      <!-- Filter -->
+      <div class="flex gap-8 mb-16" style="flex-wrap:wrap">
+        <select class="form-control" id="filter-role" style="max-width:180px" onchange="filterGuests()">
+          <option value="">Все роли</option>
+          <option value="friends">Друзья</option>
+          <option value="family">Семья</option>
+        </select>
+        <input class="form-control" id="filter-search" placeholder="Поиск по имени/логину..." style="max-width:260px" oninput="filterGuests()">
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Фамилия</th>
+              <th>Имя</th>
+              <th>Отчество</th>
+              <th>Логин</th>
+              <th>Роль</th>
+              <th>Пол</th>
+              <th>Обращение</th>
+              <th>am_i_gosha</th>
+              <th>Группа</th>
+              <th>Посещение</th>
+              <th>Действия</th>
+            </tr>
+          </thead>
+          <tbody id="guests-tbody"></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <footer><p>Панель администратора</p></footer>
+
+  <!-- Modal -->
+  <div class="modal-overlay" id="modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="modal-title">Добавить гостя</h2>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <form id="guest-form">
+        <input type="hidden" id="guest-id">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Фамилия *</label>
+            <input type="text" class="form-control" id="last-name" required>
+          </div>
+          <div class="form-group">
+            <label>Имя *</label>
+            <input type="text" class="form-control" id="first-name" required>
+          </div>
+          <div class="form-group">
+            <label>Отчество</label>
+            <input type="text" class="form-control" id="middle-name">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Роль *</label>
+            <select class="form-control" id="role" required>
+              <option value="friends">Друзья</option>
+              <option value="family">Семья</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Пол *</label>
+            <select class="form-control" id="gender">
+              <option value="male">Мужской (Дорогой)</option>
+              <option value="female">Женский (Дорогая)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Группа</label>
+            <select class="form-control" id="group-id" onchange="updateSalutationVisibility()">
+              <option value="">— без группы —</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Hidden when guest is in a group; value is preserved in DB -->
+        <div class="form-group" id="custom-salutation-wrap">
+          <label>Пользовательское обращение
+            <span class="text-muted">(если пусто — «Дорогой Имя» / «Дорогая Имя»)</span>
+          </label>
+          <input type="text" class="form-control" id="custom-salutation"
+            placeholder="Например: Дорогой {{first_name}}, Любимая {{full_name}}...">
+          <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+            <span class="text-muted" style="font-size:.8rem">Вставить:</span>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="insertPattern('{{first_name}}')">{{first_name}}</button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="insertPattern('{{last_name}}')">{{last_name}}</button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="insertPattern('{{middle_name}}')">{{middle_name}}</button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="insertPattern('{{full_name}}')">{{full_name}}</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="am-i-gosha">
+            <span>am_i_gosha (я Гоша)</span>
+          </label>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Отмена</button>
+          <button type="submit" class="btn btn-primary" id="save-btn">Сохранить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    requireAdmin();
+    function logout() { clearAuth(); window.location.href = '/login.html'; }
+
+    // Show/hide custom salutation based on whether a group is selected
+    function updateSalutationVisibility() {
+      const hasGroup = !!document.getElementById('group-id').value;
+      document.getElementById('custom-salutation-wrap').style.display = hasGroup ? 'none' : '';
+    }
+
+    // Insert template pattern at cursor position in the custom salutation field
+    function insertPattern(pattern) {
+      const input = document.getElementById('custom-salutation');
+      const start = input.selectionStart;
+      const end   = input.selectionEnd;
+      input.value = input.value.slice(0, start) + pattern + input.value.slice(end);
+      input.selectionStart = input.selectionEnd = start + pattern.length;
+      input.focus();
+    }
+
+    let allGuests = [];
+    let allGroups = [];
+
+    async function load() {
+      try {
+        [allGuests, allGroups] = await Promise.all([api.guests.list(), api.groups.list()]);
+        renderGuests(allGuests);
+        fillGroupSelect();
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    }
+
+    function fillGroupSelect() {
+      const sel = document.getElementById('group-id');
+      const current = sel.value;
+      sel.innerHTML = '<option value="">— без группы —</option>' +
+        allGroups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+      sel.value = current;
+    }
+
+    const GENDER_LABEL = { male: '♂ Муж.', female: '♀ Жен.' };
+
+    function renderGuests(guests) {
+      const tbody = document.getElementById('guests-tbody');
+      tbody.innerHTML = guests.map(g => `
+        <tr>
+          <td>${g.id}</td>
+          <td>${g.last_name}</td>
+          <td>${g.first_name}</td>
+          <td>${g.middle_name || '—'}</td>
+          <td>${g.login}</td>
+          <td><span class="badge badge-${g.role}">${g.role === 'friends' ? 'Друзья' : 'Семья'}</span></td>
+          <td>${GENDER_LABEL[g.gender] || '♂ Муж.'}</td>
+          <td>${g.custom_salutation || '<span class="text-muted">—</span>'}</td>
+          <td>${g.am_i_gosha ? '✅' : '—'}</td>
+          <td>${g.group_name || '—'}</td>
+          <td>${g.visited ? `<span class="badge badge-visited">Посетил</span>` : `<span class="badge badge-not-visited">Нет</span>`}</td>
+          <td>
+            <button class="btn btn-secondary btn-sm" onclick="editGuest(${g.id})">✏️</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteGuest(${g.id}, '${g.last_name} ${g.first_name}')">🗑</button>
+          </td>
+        </tr>
+      `).join('') || '<tr><td colspan="12" class="text-muted" style="padding:16px;text-align:center">Гостей нет</td></tr>';
+    }
+
+    function filterGuests() {
+      const role = document.getElementById('filter-role').value;
+      const search = document.getElementById('filter-search').value.toLowerCase();
+      const filtered = allGuests.filter(g =>
+        (!role || g.role === role) &&
+        (!search || (g.last_name + ' ' + g.first_name + ' ' + g.login).toLowerCase().includes(search))
+      );
+      renderGuests(filtered);
+    }
+
+    function openModal(guest = null) {
+      document.getElementById('modal-title').textContent = guest ? 'Редактировать гостя' : 'Добавить гостя';
+      document.getElementById('guest-id').value = guest ? guest.id : '';
+      document.getElementById('last-name').value = guest ? guest.last_name : '';
+      document.getElementById('first-name').value = guest ? guest.first_name : '';
+      document.getElementById('middle-name').value = guest ? guest.middle_name || '' : '';
+      document.getElementById('role').value = guest ? guest.role : 'friends';
+      document.getElementById('gender').value = guest ? (guest.gender || 'male') : 'male';
+      document.getElementById('custom-salutation').value = guest ? (guest.custom_salutation || '') : '';
+      document.getElementById('group-id').value = guest && guest.group_id ? guest.group_id : '';
+      updateSalutationVisibility();
+      document.getElementById('am-i-gosha').checked = guest ? guest.am_i_gosha : false;
+      document.getElementById('modal').classList.add('active');
+    }
+
+    function closeModal() {
+      document.getElementById('modal').classList.remove('active');
+    }
+
+    async function editGuest(id) {
+      try {
+        const g = await api.guests.get(id);
+        openModal(g);
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    }
+
+    async function deleteGuest(id, name) {
+      if (!confirmDialog(`Удалить гостя «${name}»?`)) return;
+      try {
+        await api.guests.delete(id);
+        await load();
+        showAlert(document.getElementById('alert-container'), 'Гость удалён');
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    }
+
+    document.getElementById('guest-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('guest-id').value;
+      const data = {
+        last_name:         document.getElementById('last-name').value.trim(),
+        first_name:        document.getElementById('first-name').value.trim(),
+        middle_name:       document.getElementById('middle-name').value.trim(),
+        role:              document.getElementById('role').value,
+        gender:            document.getElementById('gender').value,
+        custom_salutation: document.getElementById('custom-salutation').value.trim(),
+        am_i_gosha:        document.getElementById('am-i-gosha').checked,
+        group_id:          document.getElementById('group-id').value ? parseInt(document.getElementById('group-id').value) : null,
+      };
+      try {
+        if (id) {
+          await api.guests.update(id, data);
+        } else {
+          await api.guests.create(data);
+        }
+        closeModal();
+        await load();
+        showAlert(document.getElementById('alert-container'), id ? 'Гость обновлён' : 'Гость добавлен');
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    });
+
+    load();
+  </script>
+</body>
+</html>

@@ -1,0 +1,3 @@
+@echo off
+echo Starting wedding invitation site...
+docker-compose up --build

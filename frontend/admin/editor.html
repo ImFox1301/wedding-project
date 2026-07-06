@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Редактор страниц — Админ</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.snow.min.css">
+  <style>
+    .ql-container { font-family: Arial, sans-serif; font-size: 14px; }
+    .ql-editor    { min-height: 220px; }
+    .ql-toolbar   { border-radius: 4px 4px 0 0; }
+    .ql-container { border-radius: 0 0 4px 4px; }
+
+    /* Responsive images inside the editor */
+    .ql-editor img { max-width: 100%; height: auto; cursor: pointer; }
+    .ql-editor img:hover { outline: 2px solid #6b6b6b; outline-offset: 2px; }
+    .ql-editor img.img-selected { outline: 2px solid #3498db; outline-offset: 2px; }
+
+    /* Float clearing inside editor blocks */
+    .ql-editor > *::after { content: ''; display: block; clear: both; }
+
+    .section-preview {
+      color: #666; font-size: .85rem; max-height: 50px; overflow: hidden;
+      white-space: nowrap; text-overflow: ellipsis; margin-bottom: 10px;
+    }
+
+    /* ── Alignment popup (appears after image file is chosen) ── */
+    #align-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.55);
+      z-index: 2000;
+      align-items: center;
+      justify-content: center;
+    }
+    #align-overlay.active { display: flex; }
+    #align-box {
+      background: #fff;
+      border-radius: 8px;
+      padding: 24px;
+      max-width: 520px;
+      width: 90%;
+      box-shadow: 0 8px 32px rgba(0,0,0,.2);
+    }
+    #align-box h3 { margin: 0 0 14px; font-size: 1rem; color: #333; }
+    #align-preview-img {
+      display: block;
+      max-width: 100%; max-height: 180px;
+      margin: 0 auto 18px;
+      border: 1px solid #ddd; border-radius: 4px;
+    }
+    .align-options { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+    .align-options button {
+      padding: 8px 14px;
+      border: 1px solid #ccc; border-radius: 4px;
+      background: #f8f8f8; cursor: pointer;
+      font-size: .85rem; font-family: Arial, sans-serif;
+      transition: background .15s, border-color .15s;
+    }
+    .align-options button:hover { background: #e8e8e8; border-color: #999; }
+    .align-options button.active { background: #6b6b6b; color: #fff; border-color: #555; }
+
+    /* ── Image toolbar (appears on click of an existing image) ── */
+    #img-toolbar {
+      display: none;
+      position: fixed;
+      z-index: 1500;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-shadow: 0 2px 10px rgba(0,0,0,.15);
+      padding: 4px;
+      gap: 4px;
+      align-items: center;
+    }
+    #img-toolbar.visible { display: flex; }
+    #img-toolbar button {
+      border: 1px solid #ddd; border-radius: 3px;
+      background: #f8f8f8; cursor: pointer;
+      padding: 4px 9px; font-size: .78rem;
+      font-family: Arial, sans-serif; white-space: nowrap;
+      transition: background .1s;
+    }
+    #img-toolbar button:hover  { background: #e8e8e8; }
+    #img-toolbar button.active { background: #6b6b6b; color: #fff; border-color: #555; }
+    #img-toolbar .tb-sep { width: 1px; height: 20px; background: #ddd; margin: 0 2px; }
+  </style>
+</head>
+<body>
+  <header>
+    <a class="logo" href="/admin/">💍 Свадьба — Админ</a>
+    <div class="user-info"><button class="btn-logout" onclick="logout()">Выйти</button></div>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar">
+      <div class="sidebar-section">Гости</div>
+      <a href="/admin/guests.html">Гости</a>
+      <a href="/admin/groups.html">Группы</a>
+      <a href="/admin/links.html">Ссылки-приглашения</a>
+      <div class="sidebar-section">Контент</div>
+      <a href="/admin/editor.html" class="active">Редактор страниц</a>
+      <a href="/admin/gifts.html">Подарки</a>
+      <a href="/admin/music.html">Музыка</a>
+      <div class="sidebar-section">Аналитика</div>
+      <a href="/admin/stats.html">Статистика</a>
+      <div class="sidebar-section">Прочее</div>
+      <a href="/admin/settings.html">Настройки</a>
+    </nav>
+
+    <main class="content">
+      <h1>Редактор страниц-приглашений</h1>
+      <div id="alert-container"></div>
+
+      <p class="text-muted mb-16">
+        Каждая страница состоит из разделов. В тексте можно вставить поля гостей:
+        <code>{{last_name}}</code>, <code>{{first_name}}</code>, <code>{{middle_name}}</code>,
+        <code>{{full_name}}</code>. Подзаголовок («Вы приглашены…») настраивается в
+        <a href="/admin/settings.html">Настройках</a>.
+      </p>
+
+      <!-- Role tabs -->
+      <div class="flex gap-8 mb-16">
+        <button class="btn btn-primary"   id="tab-friends" onclick="setRole('friends')">Страница для Друзей</button>
+        <button class="btn btn-secondary" id="tab-family"  onclick="setRole('family')">Страница для Семьи</button>
+      </div>
+
+      <div class="flex align-center justify-between mb-16">
+        <h2 id="role-title">Разделы страницы «Друзья»</h2>
+        <button class="btn btn-success" onclick="addSection()">+ Добавить раздел</button>
+      </div>
+
+      <div id="sections-list"></div>
+    </main>
+  </div>
+
+  <footer><p>Панель администратора</p></footer>
+
+  <!-- ── Section Edit Modal ── -->
+  <div class="modal-overlay" id="section-modal">
+    <div class="modal" style="max-width:740px">
+      <div class="modal-header">
+        <h2 id="section-modal-title">Редактировать раздел</h2>
+        <button class="modal-close" onclick="closeSectionModal()">&times;</button>
+      </div>
+      <form id="section-form">
+        <input type="hidden" id="section-id">
+        <div class="form-group">
+          <label>Заголовок раздела</label>
+          <input type="text" class="form-control" id="section-title">
+        </div>
+        <div class="form-group">
+          <label>Текст</label>
+          <div id="section-content-editor"></div>
+        </div>
+        <div class="form-group">
+          <label>Порядок отображения</label>
+          <input type="number" class="form-control" id="section-order" value="0" style="width:100px">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeSectionModal()">Отмена</button>
+          <button type="submit" class="btn btn-primary">Сохранить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── Alignment dialog (shown after selecting an image file) ── -->
+  <div id="align-overlay">
+    <div id="align-box">
+      <h3>Выравнивание изображения</h3>
+      <img id="align-preview-img" src="" alt="">
+      <div class="align-options">
+        <button data-align="full"   onclick="commitInsert('full')">↔ Во всю ширину</button>
+        <button data-align="left"   onclick="commitInsert('left')">⬅ Слева (обтекание текстом)</button>
+        <button data-align="right"  onclick="commitInsert('right')">Справа ➡ (обтекание текстом)</button>
+        <button data-align="center" onclick="commitInsert('center')">⟷ По центру</button>
+      </div>
+      <div style="margin-top:16px;text-align:right">
+        <button class="btn btn-secondary" onclick="cancelInsert()">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Image alignment toolbar (click on image to show) ── -->
+  <div id="img-toolbar">
+    <button data-align="full"   onclick="setImgAlign('full')"   title="Во всю ширину">↔ Ширина</button>
+    <button data-align="left"   onclick="setImgAlign('left')"   title="Слева, текст справа">⬅ Слева</button>
+    <button data-align="right"  onclick="setImgAlign('right')"  title="Справа, текст слева">Справа ➡</button>
+    <button data-align="center" onclick="setImgAlign('center')" title="По центру">⟷ Центр</button>
+    <span class="tb-sep"></span>
+    <button onclick="removeSelectedImg()" title="Удалить изображение" style="color:#c0392b">✕</button>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.min.js"></script>
+  <script src="/js/api.js"></script>
+  <script>
+    requireAdmin();
+    function logout() { clearAuth(); window.location.href = '/login.html'; }
+
+    // ──────────────────────────────────────────────
+    // ALIGN STYLES
+    // ──────────────────────────────────────────────
+    const ALIGN_STYLES = {
+      full:   'display:block;max-width:100%;height:auto;margin:8px 0;',
+      left:   'float:left;max-width:45%;height:auto;margin:0 16px 12px 0;',
+      right:  'float:right;max-width:45%;height:auto;margin:0 0 12px 16px;',
+      center: 'display:block;max-width:75%;height:auto;margin:8px auto;',
+    };
+
+    // ──────────────────────────────────────────────
+    // CUSTOM IMAGE BLOT — preserves style attribute
+    // ──────────────────────────────────────────────
+    const BaseImage = Quill.import('formats/image');
+
+    class StyledImage extends BaseImage {
+      static create(value) {
+        // value can be a plain src string (paste/drop) or { src, style }
+        const src   = typeof value === 'string' ? value : (value && value.src ? value.src : value);
+        const style = typeof value === 'object' && value ? (value.style || ALIGN_STYLES.full) : ALIGN_STYLES.full;
+        const node  = super.create(src);
+        node.setAttribute('style', style);
+        return node;
+      }
+      static value(node) {
+        return { src: node.getAttribute('src'), style: node.getAttribute('style') || '' };
+      }
+      static formats(node) {
+        return { style: node.getAttribute('style') || '' };
+      }
+      format(name, value) {
+        if (name === 'style') this.domNode.setAttribute('style', value || '');
+        else super.format(name, value);
+      }
+    }
+    StyledImage.blotName = 'image';
+    StyledImage.tagName  = 'IMG';
+    Quill.register(StyledImage, true);
+
+    // ──────────────────────────────────────────────
+    // QUILL INIT
+    // ──────────────────────────────────────────────
+    const quill = new Quill('#section-content-editor', {
+      theme: 'snow',
+      placeholder: 'Введите текст раздела. Используйте {{first_name}}, {{last_name}}, {{full_name}}…',
+      modules: {
+        toolbar: {
+          container: [
+            [{ header: [2, 3, false] }],
+            ['bold', 'italic', 'underline'],
+            [{ list: 'ordered' }, { list: 'bullet' }],
+            [{ align: [] }],
+            ['link', 'image'],
+            ['clean'],
+          ],
+          handlers: { image: imageUploadHandler },
+        },
+      },
+    });
+
+    // ──────────────────────────────────────────────
+    // IMAGE INSERT FLOW
+    // ──────────────────────────────────────────────
+    let _pendingSrc = null;
+    let _pendingRange = null;
+
+    function imageUploadHandler() {
+      const input = document.createElement('input');
+      input.type = 'file'; input.accept = 'image/*';
+      input.click();
+      input.onchange = () => {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+          _pendingSrc   = e.target.result;
+          _pendingRange = quill.getSelection(true);
+          // Show alignment dialog
+          document.getElementById('align-preview-img').src = _pendingSrc;
+          // Reset active state
+          document.querySelectorAll('#align-box .align-options button').forEach(b => b.classList.remove('active'));
+          document.querySelector('#align-box [data-align="full"]').classList.add('active');
+          document.getElementById('align-overlay').classList.add('active');
+        };
+        reader.readAsDataURL(file);
+      };
+    }
+
+    function commitInsert(align) {
+      document.getElementById('align-overlay').classList.remove('active');
+      if (!_pendingSrc) return;
+      quill.insertEmbed(_pendingRange.index, 'image', { src: _pendingSrc, style: ALIGN_STYLES[align] });
+      quill.setSelection(_pendingRange.index + 1);
+      _pendingSrc = null; _pendingRange = null;
+    }
+
+    function cancelInsert() {
+      document.getElementById('align-overlay').classList.remove('active');
+      _pendingSrc = null; _pendingRange = null;
+    }
+
+    // Highlight active alignment button in dialog
+    document.querySelectorAll('#align-box .align-options button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#align-box .align-options button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    });
+
+    // ──────────────────────────────────────────────
+    // CLICK-ON-IMAGE TOOLBAR
+    // ──────────────────────────────────────────────
+    let selectedImg = null;
+    const imgToolbar = document.getElementById('img-toolbar');
+
+    quill.root.addEventListener('click', e => {
+      if (e.target.tagName === 'IMG') {
+        selectImg(e.target);
+      } else {
+        deselectImg();
+      }
+    });
+
+    // Close toolbar when clicking outside editor and toolbar
+    document.addEventListener('click', e => {
+      if (!quill.root.contains(e.target) && !imgToolbar.contains(e.target)) {
+        deselectImg();
+      }
+    }, true);
+
+    function selectImg(img) {
+      if (selectedImg) selectedImg.classList.remove('img-selected');
+      selectedImg = img;
+      img.classList.add('img-selected');
+      positionToolbar();
+      imgToolbar.classList.add('visible');
+      updateToolbarActive();
+    }
+
+    function deselectImg() {
+      if (selectedImg) selectedImg.classList.remove('img-selected');
+      selectedImg = null;
+      imgToolbar.classList.remove('visible');
+    }
+
+    function positionToolbar() {
+      if (!selectedImg) return;
+      const r = selectedImg.getBoundingClientRect();
+      imgToolbar.style.top  = (r.bottom + window.scrollY + 6) + 'px';
+      imgToolbar.style.left = (r.left   + window.scrollX)     + 'px';
+    }
+
+    function updateToolbarActive() {
+      const style = (selectedImg && selectedImg.getAttribute('style')) || '';
+      imgToolbar.querySelectorAll('button[data-align]').forEach(b => {
+        b.classList.toggle('active', ALIGN_STYLES[b.dataset.align] === style);
+      });
+    }
+
+    function setImgAlign(align) {
+      if (!selectedImg) return;
+      selectedImg.setAttribute('style', ALIGN_STYLES[align]);
+      updateToolbarActive();
+      // Re-position after potential size change
+      requestAnimationFrame(positionToolbar);
+    }
+
+    function removeSelectedImg() {
+      if (!selectedImg) return;
+      selectedImg.remove();
+      deselectImg();
+    }
+
+    // ──────────────────────────────────────────────
+    // SECTION MANAGEMENT
+    // ──────────────────────────────────────────────
+    let currentRole = 'friends';
+    let sections    = [];
+
+    function stripHtml(html) {
+      return (html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+
+    function setRole(role) {
+      currentRole = role;
+      document.getElementById('tab-friends').className = role === 'friends' ? 'btn btn-primary' : 'btn btn-secondary';
+      document.getElementById('tab-family').className  = role === 'family'  ? 'btn btn-primary' : 'btn btn-secondary';
+      document.getElementById('role-title').textContent =
+        `Разделы страницы «${role === 'friends' ? 'Друзья' : 'Семья'}»`;
+      load();
+    }
+
+    async function load() {
+      try {
+        sections = await api.sections.list(currentRole);
+        renderSections();
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    }
+
+    function renderSections() {
+      const el = document.getElementById('sections-list');
+      if (!sections.length) {
+        el.innerHTML = '<p class="text-muted">Нет разделов. Добавьте первый раздел.</p>';
+        return;
+      }
+      el.innerHTML = sections.map(s => `
+        <div class="section-item">
+          <div class="section-item-header">
+            <span class="section-item-title">${s.title || '<em>Без заголовка</em>'}</span>
+            <span class="text-muted" style="font-size:0.8rem">Порядок: ${s.order}</span>
+            <button class="btn btn-secondary btn-sm" onclick="editSection(${s.id})">✏️ Редактировать</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteSection(${s.id})">🗑</button>
+          </div>
+          <div class="section-preview">${stripHtml(s.content) || '(нет текста)'}</div>
+          <div>
+            <div class="photo-thumbs" id="photos-${s.id}">
+              ${s.photos.map(p => `
+                <div class="photo-thumb">
+                  <img src="/uploads/${p.filename}" alt="">
+                  <button class="photo-del" onclick="deletePhoto(${s.id}, ${p.id})" title="Удалить фото">✕</button>
+                </div>
+              `).join('')}
+            </div>
+            <label class="btn btn-secondary btn-sm mt-8" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+              📷 Добавить фото
+              <input type="file" accept="image/*" style="display:none" onchange="uploadPhoto(${s.id}, this)">
+            </label>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function addSection() {
+      document.getElementById('section-modal-title').textContent = 'Добавить раздел';
+      document.getElementById('section-id').value    = '';
+      document.getElementById('section-title').value = '';
+      quill.root.innerHTML = '';
+      document.getElementById('section-order').value = sections.length;
+      document.getElementById('section-modal').classList.add('active');
+      setTimeout(() => quill.focus(), 120);
+    }
+
+    function editSection(id) {
+      const s = sections.find(x => x.id === id);
+      document.getElementById('section-modal-title').textContent = 'Редактировать раздел';
+      document.getElementById('section-id').value    = s.id;
+      document.getElementById('section-title').value = s.title;
+      const content = s.content || '';
+      if (content.trim().startsWith('<')) {
+        quill.root.innerHTML = content;
+      } else {
+        // Legacy plain text → basic HTML
+        quill.root.innerHTML = content.split('\n').map(l => `<p>${l || '<br>'}</p>`).join('');
+      }
+      document.getElementById('section-order').value = s.order;
+      document.getElementById('section-modal').classList.add('active');
+      setTimeout(() => quill.focus(), 120);
+    }
+
+    function closeSectionModal() {
+      deselectImg();
+      document.getElementById('section-modal').classList.remove('active');
+    }
+
+    async function deleteSection(id) {
+      if (!confirmDialog('Удалить раздел и все его фото?')) return;
+      try {
+        await api.sections.delete(id);
+        await load();
+        showAlert(document.getElementById('alert-container'), 'Раздел удалён');
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    }
+
+    async function uploadPhoto(sectionId, input) {
+      if (!input.files[0]) return;
+      const form = new FormData();
+      form.append('photo', input.files[0]);
+      try {
+        await api.sections.uploadPhoto(sectionId, form);
+        await load();
+        showAlert(document.getElementById('alert-container'), 'Фото добавлено');
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+      input.value = '';
+    }
+
+    async function deletePhoto(sectionId, photoId) {
+      if (!confirmDialog('Удалить фото?')) return;
+      try {
+        await api.sections.deletePhoto(sectionId, photoId);
+        await load();
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    }
+
+    document.getElementById('section-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id          = document.getElementById('section-id').value;
+      const contentHtml = quill.root.innerHTML === '<p><br></p>' ? '' : quill.root.innerHTML;
+      const data = {
+        role:    currentRole,
+        title:   document.getElementById('section-title').value.trim(),
+        content: contentHtml,
+        order:   parseInt(document.getElementById('section-order').value) || 0,
+      };
+      try {
+        if (id) await api.sections.update(id, data);
+        else    await api.sections.create(data);
+        closeSectionModal();
+        await load();
+        showAlert(document.getElementById('alert-container'), id ? 'Раздел обновлён' : 'Раздел добавлен');
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    });
+
+    load();
+  </script>
+</body>
+</html>

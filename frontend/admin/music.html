@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Музыка — Админ</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <a class="logo" href="/admin/">💍 Свадьба — Админ</a>
+    <div class="user-info"><button class="btn-logout" onclick="logout()">Выйти</button></div>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar">
+      <div class="sidebar-section">Гости</div>
+      <a href="/admin/guests.html">Гости</a>
+      <a href="/admin/groups.html">Группы</a>
+      <a href="/admin/links.html">Ссылки-приглашения</a>
+      <div class="sidebar-section">Контент</div>
+      <a href="/admin/editor.html">Редактор страниц</a>
+      <a href="/admin/gifts.html">Подарки</a>
+      <a href="/admin/music.html" class="active">Музыка</a>
+      <div class="sidebar-section">Аналитика</div>
+      <a href="/admin/stats.html">Статистика</a>
+      <div class="sidebar-section">Прочее</div>
+      <a href="/admin/settings.html">Настройки</a>
+    </nav>
+
+    <main class="content">
+      <h1>Музыка для страниц</h1>
+      <div id="alert-container"></div>
+      <p class="text-muted mb-16">Треки будут воспроизводиться по очереди на странице-приглашении. Поддерживаются форматы: MP3, OGG, WAV, FLAC, M4A.</p>
+
+      <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start">
+
+        <!-- Friends music -->
+        <div style="flex:1;min-width:300px">
+          <div class="flex align-center justify-between mb-16">
+            <h2>🎵 Для друзей</h2>
+            <label class="btn btn-success btn-sm" style="cursor:pointer">
+              + Загрузить
+              <input type="file" accept="audio/*" style="display:none" onchange="uploadMusic('friends', this)">
+            </label>
+          </div>
+          <div id="friends-music"></div>
+        </div>
+
+        <!-- Family music -->
+        <div style="flex:1;min-width:300px">
+          <div class="flex align-center justify-between mb-16">
+            <h2>🎵 Для семьи</h2>
+            <label class="btn btn-success btn-sm" style="cursor:pointer">
+              + Загрузить
+              <input type="file" accept="audio/*" style="display:none" onchange="uploadMusic('family', this)">
+            </label>
+          </div>
+          <div id="family-music"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <footer><p>Панель администратора</p></footer>
+
+  <script src="/js/api.js"></script>
+  <script>
+    requireAdmin();
+    function logout() { clearAuth(); window.location.href = '/login.html'; }
+
+    async function load() {
+      try {
+        const music = await api.music.list();
+        renderMusic('friends', music.filter(m => m.role === 'friends'));
+        renderMusic('family', music.filter(m => m.role === 'family'));
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    }
+
+    function renderMusic(role, tracks) {
+      const el = document.getElementById(role + '-music');
+      if (!tracks.length) {
+        el.innerHTML = '<p class="text-muted">Нет треков</p>';
+        return;
+      }
+      el.innerHTML = `
+        <table>
+          <thead><tr><th>#</th><th>Название</th><th>Порядок</th><th></th></tr></thead>
+          <tbody>
+            ${tracks.map(t => `
+              <tr>
+                <td>${t.id}</td>
+                <td>🎵 ${t.original_name || t.filename}</td>
+                <td>
+                  <input type="number" value="${t.order}" style="width:60px;padding:2px 6px;border:1px solid #ccc;border-radius:4px"
+                    onchange="updateOrder(${t.id}, this.value)">
+                </td>
+                <td>
+                  <button class="btn btn-danger btn-sm" onclick="deleteMusic(${t.id}, '${escapeAttr(t.original_name)}')">🗑</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function escapeAttr(str) {
+      return (str || '').replace(/'/g, "\\'");
+    }
+
+    async function uploadMusic(role, input) {
+      if (!input.files[0]) return;
+      const form = new FormData();
+      form.append('music', input.files[0]);
+      form.append('role', role);
+      try {
+        await api.music.upload(form);
+        await load();
+        showAlert(document.getElementById('alert-container'), 'Трек загружен');
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+      input.value = '';
+    }
+
+    async function deleteMusic(id, name) {
+      if (!confirmDialog(`Удалить трек «${name}»?`)) return;
+      try {
+        await api.music.delete(id);
+        await load();
+        showAlert(document.getElementById('alert-container'), 'Трек удалён');
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    }
+
+    async function updateOrder(id, order) {
+      try {
+        await api.music.order(id, parseInt(order));
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>

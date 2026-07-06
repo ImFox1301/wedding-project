@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Приглашение</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <a class="logo" href="#">💍 Свадьба</a>
+    <div class="user-info">
+      <span id="guest-name-header"></span>
+      <button class="btn-logout" onclick="logout()">Выйти</button>
+    </div>
+  </header>
+
+  <div id="page-content">
+    <div style="text-align:center;padding:60px;color:#888">Загрузка приглашения...</div>
+  </div>
+
+  <!-- Music player -->
+  <div class="music-player hidden" id="music-player">
+    <span>🎵</span>
+    <span class="track-name" id="track-name">—</span>
+    <button onclick="prevTrack()">⏮</button>
+    <button onclick="togglePlay()" id="play-btn">▶</button>
+    <button onclick="nextTrack()">⏭</button>
+    <audio id="audio-el" preload="none"></audio>
+  </div>
+
+  <footer id="page-footer"><p>С любовью ❤️</p></footer>
+
+  <!-- Gift photo modal -->
+  <div id="gift-photo-modal"
+    style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.8);
+           align-items:center;justify-content:center;cursor:pointer"
+    onclick="closeGiftPhoto()">
+    <div style="position:relative;max-width:92vw;max-height:92vh" onclick="event.stopPropagation()">
+      <button onclick="closeGiftPhoto()"
+        style="position:absolute;top:-36px;right:0;background:none;border:none;
+               color:#fff;font-size:28px;line-height:1;cursor:pointer">&times;</button>
+      <img id="gift-photo-img" src="" alt="Фото подарка"
+        style="max-width:92vw;max-height:92vh;display:block;border-radius:8px;object-fit:contain">
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/daterange.js"></script>
+  <script>
+    // ──────────────────────────────────────────────
+    // AUTH
+    // ──────────────────────────────────────────────
+    function logout() { clearAuth(); window.location.href = '/login.html'; }
+
+    // ──────────────────────────────────────────────
+    // TEMPLATE
+    // ──────────────────────────────────────────────
+    function applyTemplate(text, guests) {
+      if (!guests || !guests.length) return text;
+      const g = guests[0];
+      return text
+        .replace(/\{\{first_name\}\}/g,  g.first_name  || '')
+        .replace(/\{\{last_name\}\}/g,   g.last_name   || '')
+        .replace(/\{\{middle_name\}\}/g, g.middle_name || '')
+        .replace(/\{\{full_name\}\}/g,   [g.last_name, g.first_name, g.middle_name].filter(Boolean).join(' '));
+    }
+
+    // Render section content — handles both HTML (WYSIWYG) and legacy plain text
+    function renderContent(content, guests) {
+      if (!content) return '';
+      const s = applyTemplate(content, guests);
+      return s.trim().startsWith('<') ? s : s.replace(/\n/g, '<br>');
+    }
+
+    // ──────────────────────────────────────────────
+    // DATE FORMAT
+    // ──────────────────────────────────────────────
+    function formatDateRu(str) {
+      if (!str) return 'не задана';
+      const d = new Date(str + 'T00:00:00');
+      return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
+
+    // ──────────────────────────────────────────────
+    // SALUTATION
+    // ──────────────────────────────────────────────
+    function buildSalutation(guests) {
+      if (!guests || !guests.length) return 'Дорогой гость';
+
+      // Group link — always classic "Дорогие А и Б" regardless of custom salutation
+      if (guests.length > 1) {
+        const names = guests.map(g => g.first_name);
+        const nameStr = names.length === 2
+          ? names[0] + ' и ' + names[1]
+          : names.slice(0, -1).join(', ') + ' и ' + names[names.length - 1];
+        return `Дорогие ${nameStr}`;
+      }
+
+      // Single guest
+      const g = guests[0];
+      if (g.custom_salutation && g.custom_salutation.trim()) {
+        // Custom: support {{first_name}} etc., name is NOT auto-appended
+        return applyTemplate(g.custom_salutation.trim(), guests);
+      }
+      // Default: salutation word + first name (old behaviour)
+      const word = g.gender === 'female' ? 'Дорогая' : 'Дорогой';
+      return `${word} ${g.first_name}`;
+    }
+
+    // ──────────────────────────────────────────────
+    // MUSIC
+    // ──────────────────────────────────────────────
+    let tracks = [], trackIdx = 0, playing = false;
+    const audioEl      = document.getElementById('audio-el');
+    const playBtn      = document.getElementById('play-btn');
+    const trackNameEl  = document.getElementById('track-name');
+
+    function loadTrack(idx) {
+      if (!tracks.length) return;
+      trackIdx = (idx + tracks.length) % tracks.length;
+      audioEl.src = '/uploads/' + tracks[trackIdx].filename;
+      trackNameEl.textContent = tracks[trackIdx].original_name || tracks[trackIdx].filename;
+      if (playing) audioEl.play();
+    }
+    function togglePlay() {
+      if (!tracks.length) return;
+      if (playing) { audioEl.pause(); playing = false; playBtn.textContent = '▶'; }
+      else { if (!audioEl.src || audioEl.src === window.location.href) loadTrack(0); audioEl.play(); playing = true; playBtn.textContent = '⏸'; }
+    }
+    function nextTrack() { loadTrack(trackIdx + 1); }
+    function prevTrack() { loadTrack(trackIdx - 1); }
+    audioEl.addEventListener('ended', () => loadTrack(trackIdx + 1));
+
+    async function initMusic() {
+      try {
+        tracks = await api.guestMusic();
+        if (tracks.length) { document.getElementById('music-player').classList.remove('hidden'); loadTrack(0); }
+      } catch {}
+    }
+
+    // ──────────────────────────────────────────────
+    // GOSHA BUTTON
+    // ──────────────────────────────────────────────
+    function goshaBtnBehavior(btn, canPress) {
+      if (canPress) {
+        btn.onclick = () => { btn.textContent = '🎉 ТЫ ГОША!!!'; btn.style.background = '#27ae60'; btn.disabled = true; };
+      } else {
+        btn.style.position = 'fixed';
+        function flee(e) {
+          const r  = btn.getBoundingClientRect();
+          const mx = e.clientX || (e.touches && e.touches[0]?.clientX) || r.left + r.width/2;
+          const my = e.clientY || (e.touches && e.touches[0]?.clientY) || r.top  + r.height/2;
+          const dx = (r.left + r.width/2) - mx, dy = (r.top + r.height/2) - my;
+          const d  = Math.sqrt(dx*dx + dy*dy) || 1;
+          let nx = r.left + dx/d*160, ny = r.top + dy/d*160;
+          nx = Math.max(0, Math.min(window.innerWidth  - r.width,  nx));
+          ny = Math.max(0, Math.min(window.innerHeight - r.height, ny));
+          btn.style.left = nx + 'px'; btn.style.top = ny + 'px';
+        }
+        btn.addEventListener('mousemove', flee);
+        btn.addEventListener('touchmove', flee, { passive: true });
+        btn.onclick = e => e.preventDefault();
+      }
+    }
+
+    // ──────────────────────────────────────────────
+    // GIFTS
+    // ──────────────────────────────────────────────
+    let gifts = [];
+    let giftsContainer = null;
+
+    async function reloadGifts() {
+      try { gifts = await api.guestGifts(); renderGifts(); } catch {}
+    }
+
+    function renderGifts() {
+      if (!giftsContainer) return;
+      const pickable    = gifts.filter(g =>  g.is_pickable);
+      const notPickable = gifts.filter(g => !g.is_pickable);
+
+      let html = '';
+
+      // Общее (non-pickable) — shown without pick controls
+      if (notPickable.length) {
+        html += `<h3 style="margin:0 0 12px;color:#555">Общее</h3>
+          <div class="gifts-grid mb-16">
+            ${notPickable.map(g => `
+              <div class="gift-card">
+                <h4>${g.name}</h4>
+                ${g.description ? `<div class="gift-desc">${g.description}</div>` : ''}
+              </div>
+            `).join('')}
+          </div>`;
+      }
+
+      // Pickable gifts
+      if (pickable.length) {
+        if (notPickable.length) html += `<h3 style="margin:0 0 12px;color:#555">Выберите подарок</h3>`;
+        html += `<div class="gifts-grid">
+          ${pickable.map(g => {
+            let cls = 'gift-card has-actions';
+            let badge = '', pickBtn = '';
+            if (g.is_my_pick) {
+              cls += ' picked-by-me';
+              badge   = '<span class="gift-badge" style="background:#d4edda;color:#155724">Ваш выбор</span>';
+              pickBtn = `<button class="btn btn-secondary btn-sm mt-8" onclick="unpickGift(${g.id})">Отменить выбор</button>`;
+            } else if (g.selected_by_guest_id) {
+              cls += ' picked-by-other';
+              badge = '<span class="gift-badge" style="background:#f8d7da;color:#721c24">Занят</span>';
+            } else {
+              pickBtn = `<button class="btn btn-success btn-sm mt-8" onclick="pickGift(${g.id})">Выбрать</button>`;
+            }
+            // Photo / link action bar
+            const photoBtn = g.photo_filename
+              ? `<button onclick="openGiftPhoto('/uploads/${g.photo_filename}')">📷 см. фото</button>`
+              : `<button disabled>📷 см. фото</button>`;
+            const linkBtn = g.link_url
+              ? `<button onclick="window.open('${g.link_url}','_blank')">🔗 ссылка</button>`
+              : `<button disabled>🔗 ссылка</button>`;
+            return `<div class="${cls}" id="gift-${g.id}">
+              <div class="gift-pick-area">
+                ${badge}
+                <h4>${g.name}</h4>
+                ${g.description ? `<div class="gift-desc">${g.description}</div>` : ''}
+                ${g.selected_by_name && !g.is_my_pick ? `<div class="gift-taken-by">Выбрал: ${g.selected_by_name}</div>` : ''}
+                ${pickBtn}
+              </div>
+              <div class="gift-card-actions">
+                ${photoBtn}${linkBtn}
+              </div>
+            </div>`;
+          }).join('')}
+        </div>`;
+      }
+
+      if (!html) html = '<p class="text-muted">Список подарков пуст</p>';
+      giftsContainer.querySelector('.gifts-body').innerHTML = html;
+    }
+
+    function openGiftPhoto(src) {
+      document.getElementById('gift-photo-img').src = src;
+      document.getElementById('gift-photo-modal').style.display = 'flex';
+    }
+    function closeGiftPhoto() {
+      document.getElementById('gift-photo-modal').style.display = 'none';
+      document.getElementById('gift-photo-img').src = '';
+    }
+
+    async function pickGift(id) {
+      try { await api.pickGift(id); await reloadGifts(); } catch (e) { alert(e.message); }
+    }
+    async function unpickGift(id) {
+      try { await api.unpickGift(id); await reloadGifts(); } catch (e) { alert(e.message); }
+    }
+
+    // ──────────────────────────────────────────────
+    // FRIEND FORM AUTO-SAVE
+    // ──────────────────────────────────────────────
+    let friendForm       = null;
+    let saveTimeout      = null;
+    let cottagePicker    = null;
+    let cottageArrivalDate = ''; // Fixed arrival date from admin settings
+
+    function scheduleSave() {
+      clearTimeout(saveTimeout);
+      saveTimeout = setTimeout(saveFriendForm, 1500);
+    }
+
+    async function saveFriendForm() {
+      if (!friendForm) return;
+      const going   = friendForm.querySelector('#going-cottage').checked;
+      const toDate  = cottagePicker ? cottagePicker.getValue().to : '';
+      const tourn   = friendForm.querySelector('#tournament').checked;
+      const oppSel  = friendForm.querySelector('#preferred-opponent');
+      const opp     = oppSel && oppSel.value ? parseInt(oppSel.value) : null;
+      const comment = friendForm.querySelector('#comment-text').value;
+      try {
+        await api.saveFriend({
+          going_cottage:         going,
+          cottage_date_from:     going ? (cottageArrivalDate || null) : null,
+          cottage_date_to:       going ? (toDate || null)             : null,
+          tournament:            tourn,
+          preferred_opponent_id: opp,
+          comment,
+        });
+      } catch {}
+    }
+
+    async function saveFamilyForm() {
+      const going     = document.getElementById('going-loft').checked;
+      const transport = document.getElementById('needs-transport').checked;
+      try { await api.saveFamily({ going_loft: going, needs_transport: transport }); } catch {}
+    }
+
+    // ──────────────────────────────────────────────
+    // RENDER PAGE
+    // ──────────────────────────────────────────────
+    async function renderPage(data) {
+      const { guests, role, sections, friend_response: fr, family_response: fmr,
+              cottage_date_from, cottage_date_to, page_subtitle,
+              header_text, footer_text } = data;
+
+      // Store fixed arrival date for saving
+      cottageArrivalDate = cottage_date_from || '';
+
+      // Apply dynamic header / footer text
+      if (header_text) {
+        const logo = document.querySelector('header .logo');
+        if (logo) logo.textContent = header_text;
+      }
+      if (footer_text) {
+        const fp = document.querySelector('#page-footer p');
+        if (fp) fp.textContent = footer_text;
+      }
+
+      document.getElementById('guest-name-header').textContent =
+        guests.map(g => g.first_name).join(', ');
+
+      const salutation = buildSalutation(guests);
+      const subtitle   = page_subtitle || 'Вы приглашены на нашу свадьбу 💍';
+
+      let html = `<div class="invite-page" id="invite-main">`;
+
+      // Header
+      html += `
+        <div class="invite-header">
+          <h1>${salutation}!</h1>
+          <p class="subtitle">${subtitle}</p>
+        </div>
+      `;
+
+      // Content sections
+      for (const s of sections) {
+        html += `<div class="invite-section">`;
+        if (s.title)  html += `<h2>${s.title}</h2>`;
+        if (s.content) html += `<div>${renderContent(s.content, guests)}</div>`;
+        if (s.photos && s.photos.length) {
+          html += `<div class="section-photos">`;
+          s.photos.forEach(p => { html += `<img src="/uploads/${p.filename}" alt="" loading="lazy">`; });
+          html += `</div>`;
+        }
+        html += `</div>`;
+      }
+
+      // ── Friends form ──
+      if (role === 'friends') {
+        const fd = fr || {};
+        const arrivalLabel = cottage_date_from
+          ? `<div style="margin-bottom:10px">
+               <span style="font-weight:600;color:#444">Дата заезда:</span>
+               <span style="color:#333;margin-left:6px">${formatDateRu(cottage_date_from)}</span>
+             </div>`
+          : '';
+
+        html += `
+        <div class="invite-section">
+          <h2>📋 Ваши ответы</h2>
+          <form class="guest-form" id="friend-form">
+
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="going-cottage" ${fd.going_cottage ? 'checked' : ''}>
+                <span>🏡 Еду в коттедж</span>
+              </label>
+            </div>
+
+            <div id="cottage-dates-wrap" style="display:${fd.going_cottage ? 'block' : 'none'}">
+              ${arrivalLabel}
+              <label style="font-size:.85rem;color:#555;font-weight:bold;display:block;margin-bottom:8px">Выберите дату выезда</label>
+              <div id="cottage-picker"></div>
+            </div>
+
+            <div class="form-group mt-16">
+              <label class="checkbox-label">
+                <input type="checkbox" id="tournament" ${fd.tournament ? 'checked' : ''}>
+                <span>🏆 Участвую в турнире</span>
+              </label>
+            </div>
+
+            <div id="opponent-wrap" style="display:${fd.tournament ? 'block' : 'none'}">
+              <div class="form-group">
+                <label>Желаемый соперник в 1-м раунде</label>
+                <select class="form-control" id="preferred-opponent">
+                  <option value="">— без предпочтений —</option>
+                </select>
+              </div>
+            </div>
+
+          </form>
+        </div>
+
+        <div class="invite-section" id="gifts-section">
+          <h2>🎁 Список подарков</h2>
+          <p class="text-muted mb-16">Выберите подарок, который хотите подарить.</p>
+          <div class="gifts-body"></div>
+        </div>
+
+        <div class="invite-section">
+          <div class="form-group">
+            <label>Комментарий</label>
+            <textarea class="form-control" id="comment-text" rows="10"
+              style="overflow:auto;resize:vertical"
+              placeholder="Ваш комментарий...">${fd.comment || ''}</textarea>
+          </div>
+        </div>
+
+        <div class="gosha-btn-wrap">
+          <button class="gosha-btn" id="gosha-btn">Я ГОША</button>
+        </div>`;
+      }
+
+      // ── Family form ──
+      if (role === 'family') {
+        const fmd = fmr || {};
+        html += `
+        <div class="invite-section">
+          <h2>📋 Ваши ответы</h2>
+          <form class="guest-form" id="family-form">
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="going-loft" ${fmd.going_loft ? 'checked' : ''}>
+                <span>🏙 Еду в лофт</span>
+              </label>
+            </div>
+            <div id="transport-wrap" style="display:${fmd.going_loft ? 'block' : 'none'}">
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="needs-transport" ${fmd.needs_transport ? 'checked' : ''}>
+                  <span>🚌 Нужен транспорт до лофта</span>
+                </label>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <div class="invite-section" id="gifts-section">
+          <h2>🎁 Список подарков</h2>
+          <p class="text-muted mb-16">Выберите подарок, который хотите подарить.</p>
+          <div class="gifts-body"></div>
+        </div>`;
+      }
+
+      html += `</div>`; // invite-page
+      document.getElementById('page-content').innerHTML = html;
+
+      // ── Post-render wiring ──
+
+      if (role === 'friends') {
+        friendForm    = document.getElementById('friend-form');
+        giftsContainer = document.getElementById('gifts-section');
+
+        // Cottage picker — fixed arrival, guest picks only departure
+        if (cottage_date_from) {
+          const cottagePickerEl = document.getElementById('cottage-picker');
+          cottagePicker = new DateRangePicker(cottagePickerEl, {
+            min:       cottage_date_from,
+            max:       cottage_date_to   || undefined,
+            fixedFrom: cottage_date_from,                     // arrival is fixed
+            to:        fr && fr.cottage_date_to ? fr.cottage_date_to : '',
+            labelTo:   'Дата выезда',
+            onChange:  () => scheduleSave(),
+          });
+        }
+
+        // Cottage toggle
+        const goingCottage = document.getElementById('going-cottage');
+        const cottageDates  = document.getElementById('cottage-dates-wrap');
+        goingCottage.addEventListener('change', () => {
+          cottageDates.style.display = goingCottage.checked ? 'block' : 'none';
+          scheduleSave();
+        });
+
+        // Tournament toggle
+        const tourn   = document.getElementById('tournament');
+        const oppWrap = document.getElementById('opponent-wrap');
+        tourn.addEventListener('change', () => {
+          oppWrap.style.display = tourn.checked ? 'block' : 'none';
+          scheduleSave();
+        });
+
+        // Load friends list for opponent selector
+        try {
+          const friends = await api.friendsList();
+          const sel = document.getElementById('preferred-opponent');
+          friends.forEach(f => {
+            const opt = document.createElement('option');
+            opt.value = f.id;
+            opt.textContent = [f.last_name, f.first_name, f.middle_name].filter(Boolean).join(' ');
+            if (fr && fr.preferred_opponent_id === f.id) opt.selected = true;
+            sel.appendChild(opt);
+          });
+          sel.addEventListener('change', scheduleSave);
+        } catch {}
+
+        document.getElementById('comment-text').addEventListener('input', scheduleSave);
+        document.getElementById('going-cottage').addEventListener('change', scheduleSave);
+        document.getElementById('tournament').addEventListener('change', scheduleSave);
+
+        // Gifts
+        await reloadGifts();
+
+        // Gosha button
+        goshaBtnBehavior(document.getElementById('gosha-btn'), guests.some(g => g.am_i_gosha));
+      }
+
+      if (role === 'family') {
+        const goingLoft     = document.getElementById('going-loft');
+        const transportWrap = document.getElementById('transport-wrap');
+        goingLoft.addEventListener('change', () => {
+          transportWrap.style.display = goingLoft.checked ? 'block' : 'none';
+          saveFamilyForm();
+        });
+        document.getElementById('needs-transport').addEventListener('change', saveFamilyForm);
+
+        // Gifts for family
+        giftsContainer = document.getElementById('gifts-section');
+        await reloadGifts();
+      }
+
+      // Music
+      if (getToken()) await initMusic();
+    }
+
+    // ──────────────────────────────────────────────
+    // INIT
+    // ──────────────────────────────────────────────
+    async function init() {
+      const params = new URLSearchParams(window.location.search);
+      const token  = params.get('token');
+
+      if (token) {
+        // Public token — open without login
+        try {
+          const data = await api.invite(token);
+          if (data.error) {
+            document.getElementById('page-content').innerHTML =
+              `<div style="text-align:center;padding:60px;color:#c00">${data.error}</div>`;
+            return;
+          }
+          // Store guest JWT so authenticated API calls (gifts, forms) work correctly
+          if (data.guest_token) {
+            setAuth(data.guest_token, data.role, data.guest_id);
+          }
+          await renderPage(data);
+        } catch (err) {
+          document.getElementById('page-content').innerHTML =
+            `<div style="text-align:center;padding:60px;color:#c00">Ошибка: ${err.message}</div>`;
+        }
+      } else {
+        requireGuest();
+        document.getElementById('page-content').innerHTML = `
+          <div style="text-align:center;padding:60px;color:#888">
+            <p>Используйте ссылку-приглашение, отправленную вам.</p>
+          </div>`;
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

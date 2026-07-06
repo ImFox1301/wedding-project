@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Подарки — Админ</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <a class="logo" href="/admin/">💍 Свадьба — Админ</a>
+    <div class="user-info"><button class="btn-logout" onclick="logout()">Выйти</button></div>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar">
+      <div class="sidebar-section">Гости</div>
+      <a href="/admin/guests.html">Гости</a>
+      <a href="/admin/groups.html">Группы</a>
+      <a href="/admin/links.html">Ссылки-приглашения</a>
+      <div class="sidebar-section">Контент</div>
+      <a href="/admin/editor.html">Редактор страниц</a>
+      <a href="/admin/gifts.html" class="active">Подарки</a>
+      <a href="/admin/music.html">Музыка</a>
+      <div class="sidebar-section">Аналитика</div>
+      <a href="/admin/stats.html">Статистика</a>
+      <div class="sidebar-section">Прочее</div>
+      <a href="/admin/settings.html">Настройки</a>
+    </nav>
+
+    <main class="content">
+      <div class="flex align-center justify-between mb-16">
+        <h1>Подарки</h1>
+        <button class="btn btn-primary" onclick="openModal()">+ Добавить подарок</button>
+      </div>
+      <div id="alert-container"></div>
+
+      <div>
+        <h2 class="mb-16">🎁 Список для друзей</h2>
+        <div id="friends-gifts" class="mb-16"></div>
+      </div>
+      <div>
+        <h2 class="mb-16">🎁 Список для семьи</h2>
+        <div id="family-gifts"></div>
+      </div>
+    </main>
+  </div>
+
+  <footer><p>Панель администратора</p></footer>
+
+  <!-- Modal -->
+  <div class="modal-overlay" id="modal">
+    <div class="modal" style="max-width:540px">
+      <div class="modal-header">
+        <h2 id="modal-title">Добавить подарок</h2>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <form id="gift-form">
+        <input type="hidden" id="gift-id">
+        <div class="form-group">
+          <label>Название *</label>
+          <input type="text" class="form-control" id="gift-name" required>
+        </div>
+        <div class="form-group">
+          <label>Описание</label>
+          <textarea class="form-control" id="gift-desc" rows="2"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Список</label>
+          <select class="form-control" id="gift-role" onchange="onRoleChange()">
+            <option value="friends">Друзья</option>
+            <option value="family">Семья</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="gift-pickable" checked onchange="togglePickableFields()">
+            <span>is_pickable (гость может выбрать)</span>
+          </label>
+        </div>
+
+        <!-- Fields only for pickable gifts -->
+        <div id="pickable-fields">
+          <div class="form-group">
+            <label>Ссылка</label>
+            <input type="url" class="form-control" id="gift-link" placeholder="https://...">
+          </div>
+          <div class="form-group">
+            <label>Фото</label>
+            <!-- Current photo preview -->
+            <div id="current-photo-wrap" style="display:none;margin-bottom:8px">
+              <img id="current-photo-img" src="" alt="Текущее фото"
+                style="max-width:100%;max-height:160px;border-radius:6px;display:block;margin-bottom:6px">
+              <button type="button" class="btn btn-danger btn-sm" onclick="removePhoto()">🗑 Удалить фото</button>
+            </div>
+            <input type="file" class="form-control" id="gift-photo" accept="image/*">
+            <small class="text-muted">JPG, PNG, WEBP, GIF. Загрузится после сохранения.</small>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Отмена</button>
+          <button type="submit" class="btn btn-primary">Сохранить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    requireAdmin();
+    function logout() { clearAuth(); window.location.href = '/login.html'; }
+
+    async function load() {
+      try {
+        const gifts = await api.gifts.list();
+        const friends = gifts.filter(g => g.role === 'friends');
+        const family  = gifts.filter(g => g.role === 'family');
+        renderGifts('friends-gifts', friends);
+        renderGifts('family-gifts', family);
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    }
+
+    function renderGifts(containerId, gifts) {
+      const el = document.getElementById(containerId);
+      if (!gifts.length) {
+        el.innerHTML = '<p class="text-muted">Нет подарков</p>';
+        return;
+      }
+      el.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Название</th>
+              <th>Описание</th>
+              <th>is_pickable</th>
+              <th>Фото</th>
+              <th>Ссылка</th>
+              <th>Выбрал</th>
+              <th style="width:80px">Действия</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${gifts.map(g => `
+              <tr>
+                <td>${g.name}</td>
+                <td>${g.description || '—'}</td>
+                <td>${g.is_pickable ? '✅' : '❌'}</td>
+                <td>${g.photo_filename
+                  ? `<img src="/uploads/${g.photo_filename}" style="height:36px;border-radius:4px;object-fit:cover">`
+                  : '—'}</td>
+                <td>${g.link_url
+                  ? `<a href="${g.link_url}" target="_blank" style="font-size:.8rem">🔗 открыть</a>`
+                  : '—'}</td>
+                <td>${g.selected_by_name || '—'}</td>
+                <td style="white-space:nowrap">
+                  <div style="display:flex;gap:4px;align-items:center">
+                    <button class="btn btn-secondary btn-sm" style="height:28px;padding:0 8px"
+                      onclick='editGift(${JSON.stringify(g)})'>✏️</button>
+                    <button class="btn btn-danger btn-sm" style="height:28px;padding:0 8px"
+                      onclick="deleteGift(${g.id}, '${g.name.replace(/'/g, "\\'")}')">🗑</button>
+                  </div>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function onRoleChange() {
+      const isFamily = document.getElementById('gift-role').value === 'family';
+      const cb = document.getElementById('gift-pickable');
+      if (isFamily) {
+        cb.checked = false;
+        cb.disabled = true;
+      } else {
+        cb.disabled = false;
+      }
+      togglePickableFields();
+    }
+
+    function togglePickableFields() {
+      const pickable = document.getElementById('gift-pickable').checked;
+      document.getElementById('pickable-fields').style.display = pickable ? '' : 'none';
+    }
+
+    function openModal(gift = null) {
+      document.getElementById('modal-title').textContent = gift ? 'Редактировать подарок' : 'Добавить подарок';
+      document.getElementById('gift-id').value    = gift ? gift.id : '';
+      document.getElementById('gift-name').value  = gift ? gift.name : '';
+      document.getElementById('gift-desc').value  = gift ? (gift.description || '') : '';
+      document.getElementById('gift-role').value  = gift ? gift.role : 'friends';
+      document.getElementById('gift-pickable').checked = gift ? gift.is_pickable : true;
+      document.getElementById('gift-pickable').disabled = false;
+      document.getElementById('gift-link').value  = gift ? (gift.link_url || '') : '';
+      document.getElementById('gift-photo').value = '';
+
+      // Show/hide current photo
+      const photoWrap = document.getElementById('current-photo-wrap');
+      const photoImg  = document.getElementById('current-photo-img');
+      if (gift && gift.photo_filename) {
+        photoImg.src = '/uploads/' + gift.photo_filename;
+        photoWrap.style.display = '';
+      } else {
+        photoWrap.style.display = 'none';
+      }
+
+      onRoleChange(); // applies family→is_pickable=false rule then calls togglePickableFields
+      document.getElementById('modal').classList.add('active');
+    }
+
+    function closeModal() {
+      document.getElementById('modal').classList.remove('active');
+    }
+
+    function editGift(g) {
+      openModal(g);
+    }
+
+    async function removePhoto() {
+      const id = document.getElementById('gift-id').value;
+      if (!id) return;
+      try {
+        await api.gifts.deletePhoto(id);
+        document.getElementById('current-photo-wrap').style.display = 'none';
+        document.getElementById('current-photo-img').src = '';
+        await load();
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    }
+
+    async function deleteGift(id, name) {
+      if (!confirmDialog(`Удалить подарок «${name}»?`)) return;
+      try {
+        await api.gifts.delete(id);
+        await load();
+        showAlert(document.getElementById('alert-container'), 'Подарок удалён');
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    }
+
+    document.getElementById('gift-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('gift-id').value;
+      const isPickable = document.getElementById('gift-pickable').checked;
+      const data = {
+        name:        document.getElementById('gift-name').value.trim(),
+        description: document.getElementById('gift-desc').value.trim(),
+        role:        document.getElementById('gift-role').value,
+        is_pickable: isPickable,
+        link_url:    isPickable ? document.getElementById('gift-link').value.trim() : '',
+      };
+      try {
+        let giftId = id;
+        if (id) {
+          await api.gifts.update(id, data);
+        } else {
+          const res = await api.gifts.create(data);
+          giftId = res.id;
+        }
+
+        // Upload photo if file selected
+        if (isPickable && giftId) {
+          const fileInput = document.getElementById('gift-photo');
+          if (fileInput.files && fileInput.files[0]) {
+            const form = new FormData();
+            form.append('photo', fileInput.files[0]);
+            await api.gifts.uploadPhoto(giftId, form);
+          }
+        }
+
+        closeModal();
+        await load();
+        showAlert(document.getElementById('alert-container'), id ? 'Подарок обновлён' : 'Подарок добавлен');
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    });
+
+    load();
+  </script>
+</body>
+</html>
