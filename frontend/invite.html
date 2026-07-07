@@ -460,6 +460,28 @@
       saveTimeout = setTimeout(saveFriendForm, 1500);
     }
 
+    function showSaveStatus(ok) {
+      let el = document.getElementById('save-status');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'save-status';
+        el.style.cssText =
+          'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);' +
+          'padding:6px 18px;border-radius:20px;font-size:.82rem;z-index:3000;' +
+          'pointer-events:none;transition:opacity .4s';
+        document.body.appendChild(el);
+      }
+      clearTimeout(el._t);
+      if (ok) {
+        el.textContent = '✓ Сохранено';
+        el.style.cssText += ';background:#dcfce7;color:#15803d;opacity:1';
+      } else {
+        el.textContent = '⚠ Не удалось сохранить';
+        el.style.cssText += ';background:#fee2e2;color:#b91c1c;opacity:1';
+      }
+      el._t = setTimeout(() => { el.style.opacity = '0'; }, 2000);
+    }
+
     async function saveFriendForm() {
       if (!friendForm) return;
       const going   = friendForm.querySelector('#going-cottage').checked;
@@ -467,7 +489,7 @@
       const tourn   = friendForm.querySelector('#tournament').checked;
       const oppSel  = friendForm.querySelector('#preferred-opponent');
       const opp     = oppSel && oppSel.value ? parseInt(oppSel.value) : null;
-      const comment = friendForm.querySelector('#comment-text').value;
+      const comment = (document.getElementById('comment-text') || {}).value || '';
       try {
         await api.saveFriend({
           going_cottage:         going,
@@ -477,13 +499,23 @@
           preferred_opponent_id: opp,
           comment,
         });
-      } catch {}
+        showSaveStatus(true);
+      } catch (e) {
+        console.error('saveFriend failed:', e);
+        showSaveStatus(false);
+      }
     }
 
     async function saveFamilyForm() {
       const going     = document.getElementById('going-loft').checked;
       const transport = document.getElementById('needs-transport').checked;
-      try { await api.saveFamily({ going_loft: going, needs_transport: transport }); } catch {}
+      try {
+        await api.saveFamily({ going_loft: going, needs_transport: transport });
+        showSaveStatus(true);
+      } catch (e) {
+        console.error('saveFamily failed:', e);
+        showSaveStatus(false);
+      }
     }
 
     // ──────────────────────────────────────────────

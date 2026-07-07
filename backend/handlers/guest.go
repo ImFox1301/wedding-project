@@ -132,44 +132,49 @@ func GetInvitePage(c *gin.Context) {
 		sections = []Section{}
 	}
 
-	// Load existing responses
+	// Load existing responses — use primary guest ID regardless of link type
+	// (group links have guestID=nil, but primaryGuest is always set)
 	var friendResp *map[string]interface{}
 	var familyResp *map[string]interface{}
 
-	if role == "friends" && guestID != nil {
-		var going bool
-		var df, dt *string
-		var tourn bool
-		var oppID *int
-		var comment string
-		err := db.DB.QueryRow(
-			`SELECT going_cottage, cottage_date_from::text, cottage_date_to::text, tournament, preferred_opponent_id, comment
-			 FROM friend_responses WHERE guest_id=$1`, *guestID,
-		).Scan(&going, &df, &dt, &tourn, &oppID, &comment)
-		if err == nil {
-			m := map[string]interface{}{
-				"going_cottage":        going,
-				"cottage_date_from":    df,
-				"cottage_date_to":      dt,
-				"tournament":           tourn,
-				"preferred_opponent_id": oppID,
-				"comment":              comment,
-			}
-			friendResp = &m
-		}
-	}
+	if len(guests) > 0 {
+		primaryID := guests[0].ID
 
-	if role == "family" && guestID != nil {
-		var going, transport bool
-		err := db.DB.QueryRow(
-			`SELECT going_loft, needs_transport FROM family_responses WHERE guest_id=$1`, *guestID,
-		).Scan(&going, &transport)
-		if err == nil {
-			m := map[string]interface{}{
-				"going_loft":      going,
-				"needs_transport": transport,
+		if role == "friends" {
+			var going bool
+			var df, dt *string
+			var tourn bool
+			var oppID *int
+			var comment string
+			err := db.DB.QueryRow(
+				`SELECT going_cottage, cottage_date_from::text, cottage_date_to::text, tournament, preferred_opponent_id, comment
+				 FROM friend_responses WHERE guest_id=$1`, primaryID,
+			).Scan(&going, &df, &dt, &tourn, &oppID, &comment)
+			if err == nil {
+				m := map[string]interface{}{
+					"going_cottage":         going,
+					"cottage_date_from":     df,
+					"cottage_date_to":       dt,
+					"tournament":            tourn,
+					"preferred_opponent_id": oppID,
+					"comment":               comment,
+				}
+				friendResp = &m
 			}
-			familyResp = &m
+		}
+
+		if role == "family" {
+			var going, transport bool
+			err := db.DB.QueryRow(
+				`SELECT going_loft, needs_transport FROM family_responses WHERE guest_id=$1`, primaryID,
+			).Scan(&going, &transport)
+			if err == nil {
+				m := map[string]interface{}{
+					"going_loft":      going,
+					"needs_transport": transport,
+				}
+				familyResp = &m
+			}
 		}
 	}
 
