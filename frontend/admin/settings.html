@@ -71,6 +71,69 @@
         </form>
       </div>
 
+      <!-- Attendance decline text -->
+      <div class="card mb-16">
+        <div class="card-header"><h2>🙅 Текст при ответе «Не приду»</h2></div>
+        <p class="text-muted mb-16">Показывается гостю, если он выбрал «Не приду». Он всегда сможет передумать и нажать «Приду».</p>
+        <form id="decline-form">
+          <div class="form-group">
+            <label>Текст</label>
+            <textarea class="form-control" id="decline-text" rows="3"
+              placeholder="Очень жаль, что вы не сможете быть с нами..."></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary">Сохранить</button>
+        </form>
+      </div>
+
+      <!-- Checkbox labels -->
+      <div class="card mb-16">
+        <div class="card-header"><h2>☑️ Подписи опций (чекбоксов)</h2></div>
+        <p class="text-muted mb-16">Заголовок и краткое описание для каждой опции на страницах-приглашениях.</p>
+        <form id="labels-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label>«Коттедж» — заголовок</label>
+              <input type="text" class="form-control" id="label_cottage_title">
+            </div>
+            <div class="form-group">
+              <label>«Коттедж» — описание</label>
+              <input type="text" class="form-control" id="label_cottage_desc">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>«Турнир» — заголовок</label>
+              <input type="text" class="form-control" id="label_tournament_title">
+            </div>
+            <div class="form-group">
+              <label>«Турнир» — описание</label>
+              <input type="text" class="form-control" id="label_tournament_desc">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>«Лофт» — заголовок</label>
+              <input type="text" class="form-control" id="label_loft_title">
+            </div>
+            <div class="form-group">
+              <label>«Лофт» — описание</label>
+              <input type="text" class="form-control" id="label_loft_desc">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>«Транспорт» — заголовок</label>
+              <input type="text" class="form-control" id="label_transport_title">
+            </div>
+            <div class="form-group">
+              <label>«Транспорт» — описание</label>
+              <input type="text" class="form-control" id="label_transport_desc">
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary">Сохранить</button>
+        </form>
+      </div>
+
       <!-- Cottage date range -->
       <div class="card mb-16">
         <div class="card-header"><h2>🏡 Коттедж — допустимый период пребывания</h2></div>
@@ -108,6 +171,13 @@
         document.getElementById('footer-text').value         = s['footer_text']            || '';
         document.getElementById('subtitle-friends').value    = s['page_subtitle_friends']  || '';
         document.getElementById('subtitle-family').value     = s['page_subtitle_family']   || '';
+        document.getElementById('decline-text').value        = s['decline_text']           || '';
+
+        ['label_cottage_title', 'label_cottage_desc',
+         'label_tournament_title', 'label_tournament_desc',
+         'label_loft_title', 'label_loft_desc',
+         'label_transport_title', 'label_transport_desc'
+        ].forEach(k => { document.getElementById(k).value = s[k] || ''; });
 
         cottageFrom = s['cottage_date_from'] || '';
         cottageTo   = s['cottage_date_to']   || '';
@@ -157,6 +227,34 @@
           page_subtitle_family:  document.getElementById('subtitle-family').value.trim(),
         });
         showAlert(document.getElementById('alert-container'), 'Подзаголовки сохранены');
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    });
+
+    // Decline text
+    document.getElementById('decline-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        await api.settings.update({ decline_text: document.getElementById('decline-text').value.trim() });
+        showAlert(document.getElementById('alert-container'), 'Текст отказа сохранён');
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    });
+
+    // Checkbox labels
+    document.getElementById('labels-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const keys = ['label_cottage_title', 'label_cottage_desc',
+        'label_tournament_title', 'label_tournament_desc',
+        'label_loft_title', 'label_loft_desc',
+        'label_transport_title', 'label_transport_desc'];
+      const data = {};
+      keys.forEach(k => { data[k] = document.getElementById(k).value.trim(); });
+      try {
+        await api.settings.update(data);
+        showAlert(document.getElementById('alert-container'), 'Подписи опций сохранены');
       } catch (err) {
         showAlert(document.getElementById('alert-container'), err.message, 'danger');
       }

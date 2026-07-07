@@ -145,9 +145,10 @@ const api = {
   // Guest
   invite: (token) => fetch(API_BASE + '/invite/' + token).then(r => r.json()),
 
-  guestMe:     ()           => api.get('/guest/me'),
-  saveFriend:  (data)       => api.put('/guest/response/friend', data),
-  saveFamily:  (data)       => api.put('/guest/response/family', data),
+  guestMe:      ()           => api.get('/guest/me'),
+  saveFriend:   (data)       => api.put('/guest/response/friend', data),
+  saveFamily:   (data)       => api.put('/guest/response/family', data),
+  saveAttendance: (data)     => api.put('/guest/response/attendance', data),
   guestGifts:  ()           => api.get('/guest/gifts'),
   pickGift:    (id)         => api.post('/guest/gifts/' + id + '/pick'),
   unpickGift:  (id)         => apiRequest('DELETE', '/guest/gifts/' + id + '/pick'),

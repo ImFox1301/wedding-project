@@ -127,6 +127,9 @@ func Migrate() {
 		// Admin reply to a guest's comment
 		`ALTER TABLE friend_responses ADD COLUMN IF NOT EXISTS admin_reply TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE friend_responses ADD COLUMN IF NOT EXISTS admin_reply_at TIMESTAMP`,
+		// Attendance ("Приду / Не приду") — NULL = not decided yet
+		`ALTER TABLE friend_responses ADD COLUMN IF NOT EXISTS attending BOOLEAN`,
+		`ALTER TABLE family_responses ADD COLUMN IF NOT EXISTS attending BOOLEAN`,
 		// Default settings
 		`INSERT INTO admin_settings (key, value) VALUES
 			('cottage_date_from',      ''),
@@ -134,7 +137,16 @@ func Migrate() {
 			('page_subtitle_friends',  'Вы приглашены на нашу свадьбу 💍'),
 			('page_subtitle_family',   'Вы приглашены на нашу свадьбу 💍'),
 			('header_text',            '💍 Свадьба'),
-			('footer_text',            'С любовью ❤️')
+			('footer_text',            'С любовью ❤️'),
+			('decline_text',           'Очень жаль, что вы не сможете быть с нами. Спасибо, что дали знать! ❤️'),
+			('label_cottage_title',    'Еду в коттедж'),
+			('label_cottage_desc',     'Загородный отдых с ночёвкой'),
+			('label_tournament_title', 'Участвую в турнире'),
+			('label_tournament_desc',  'Дружеские соревнования'),
+			('label_loft_title',       'Еду в лофт'),
+			('label_loft_desc',        'Празднование в лофте'),
+			('label_transport_title',  'Нужен транспорт до лофта'),
+			('label_transport_desc',   'Организованный трансфер')
 		ON CONFLICT (key) DO NOTHING`,
 	}
 

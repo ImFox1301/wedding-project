@@ -111,6 +111,7 @@ func main() {
 		guest.GET("/me", handlers.GetGuestInfo)
 		guest.PUT("/response/friend", handlers.SaveFriendResponse)
 		guest.PUT("/response/family", handlers.SaveFamilyResponse)
+		guest.PUT("/response/attendance", handlers.SaveAttendance)
 		guest.GET("/gifts", handlers.GetGifts)
 		guest.POST("/gifts/:id/pick", handlers.PickGift)
 		guest.DELETE("/gifts/:id/pick", handlers.UnpickGift)

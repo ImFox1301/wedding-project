@@ -221,6 +221,31 @@ func GetInvitePage(c *gin.Context) {
 		footerText = "С любовью ❤️"
 	}
 
+	// Attendance ("Приду / Не приду"). For groups it is shared, so reading the
+	// primary guest's value reflects the whole group.
+	var attending *bool
+	if role == "friends" {
+		db.DB.QueryRow(`SELECT attending FROM friend_responses WHERE guest_id=$1`, guests[0].ID).Scan(&attending)
+	} else {
+		db.DB.QueryRow(`SELECT attending FROM family_responses WHERE guest_id=$1`, guests[0].ID).Scan(&attending)
+	}
+
+	// Configurable "не приду" text and editable checkbox labels
+	var declineText string
+	db.DB.QueryRow(`SELECT value FROM admin_settings WHERE key='decline_text'`).Scan(&declineText)
+
+	labels := gin.H{}
+	for _, k := range []string{
+		"label_cottage_title", "label_cottage_desc",
+		"label_tournament_title", "label_tournament_desc",
+		"label_loft_title", "label_loft_desc",
+		"label_transport_title", "label_transport_desc",
+	} {
+		var v string
+		db.DB.QueryRow(`SELECT value FROM admin_settings WHERE key=$1`, k).Scan(&v)
+		labels[k] = v
+	}
+
 	// Issue a guest JWT so invite page can make authenticated API calls
 	// (gifts, pick/unpick, forms). Use first guest's ID and role.
 	primaryGuest := guests[0]
@@ -233,6 +258,9 @@ func GetInvitePage(c *gin.Context) {
 		"friend_response":   friendResp,
 		"family_response":   familyResp,
 		"family_responses":  famResponses,
+		"attending":         attending,
+		"decline_text":      declineText,
+		"labels":            labels,
 		"cottage_date_from": cottageFrom,
 		"cottage_date_to":   cottageTo,
 		"page_subtitle":     pageSubtitle,
@@ -352,6 +380,66 @@ func SaveFamilyResponse(c *gin.Context) {
 		if err := upsert(guestID, *req.GoingLoft, nt); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+// SaveAttendance stores the "Приду / Не приду" choice. For friends it is
+// personal; for family it is shared across the whole group.
+func SaveAttendance(c *gin.Context) {
+	guestIDVal, _ := c.Get("user_id")
+	guestID := guestIDVal.(int)
+
+	var req struct {
+		Attending bool `json:"attending"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var role string
+	db.DB.QueryRow(`SELECT role FROM guests WHERE id=$1`, guestID).Scan(&role)
+
+	if role == "friends" {
+		_, err := db.DB.Exec(`
+			INSERT INTO friend_responses (guest_id, attending, updated_at)
+			VALUES ($1,$2,NOW())
+			ON CONFLICT (guest_id) DO UPDATE SET attending=EXCLUDED.attending, updated_at=NOW()`,
+			guestID, req.Attending,
+		)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	} else {
+		// Family: apply to the whole group (shared decision), or just self.
+		targets := []int{guestID}
+		var groupID *int
+		db.DB.QueryRow(`SELECT group_id FROM guests WHERE id=$1`, guestID).Scan(&groupID)
+		if groupID != nil {
+			if rows, err := db.DB.Query(`SELECT id FROM guests WHERE group_id=$1`, *groupID); err == nil {
+				defer rows.Close()
+				targets = nil
+				for rows.Next() {
+					var id int
+					rows.Scan(&id)
+					targets = append(targets, id)
+				}
+			}
+		}
+		for _, id := range targets {
+			if _, err := db.DB.Exec(`
+				INSERT INTO family_responses (guest_id, attending, updated_at)
+				VALUES ($1,$2,NOW())
+				ON CONFLICT (guest_id) DO UPDATE SET attending=EXCLUDED.attending, updated_at=NOW()`,
+				id, req.Attending,
+			); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
 		}
 	}
 

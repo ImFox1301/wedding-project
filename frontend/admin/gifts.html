@@ -214,8 +214,15 @@
     function onRoleChange() {
       const isFamily = document.getElementById('gift-role').value === 'family';
       const cb = document.getElementById('gift-pickable');
-      if (isFamily) { cb.checked = false; cb.disabled = true; }
-      else { cb.disabled = false; }
+      if (isFamily) {
+        cb.checked = false;
+        cb.disabled = true;
+      } else {
+        // Switching back to "Друзья": re-enable and restore the pickable state
+        // (family forces it off), so the friends-only fields appear again.
+        if (cb.disabled) cb.checked = true;
+        cb.disabled = false;
+      }
       togglePickableFields();
     }
 

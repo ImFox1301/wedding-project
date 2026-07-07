@@ -437,52 +437,74 @@
           <img src="/uploads/${p.filename}" alt="" loading="lazy">
         </div>`).join('') : '';
 
+      const dots = many ? `<div class="sg-dots" id="sg-dots-${s.id}">${
+        s.photos.map((_, i) => `<span class="sg-dot ${i === idx ? 'active' : ''}" onclick="sgSetPhoto(${s.id},${i})"></span>`).join('')
+      }</div>` : '';
+
+      // Gallery is always visible when a section has photos
       return `
         <div class="section-gallery" id="sg-${s.id}">
-          <button class="section-gallery-toggle" onclick="sgToggle(${s.id})">
-            📷 Фотографии (${s.photos.length})
-            <span id="sg-arrow-${s.id}">▾</span>
-          </button>
-          <div class="section-gallery-body" id="sg-body-${s.id}" style="display:none">
-            <div class="section-gallery-main">
-              ${many ? `<button class="section-gallery-nav prev" onclick="sgPrev(${s.id})">&#8249;</button>` : ''}
-              <img id="sg-img-${s.id}" src="/uploads/${cur.filename}" alt="" loading="lazy">
-              <button class="section-gallery-zoom" onclick="openGiftPhoto('/uploads/${cur.filename}')"
-                      id="sg-zoom-${s.id}">🔍</button>
-              ${many ? `<button class="section-gallery-nav next" onclick="sgNext(${s.id})">&#8250;</button>` : ''}
-            </div>
-            ${many ? `<div class="section-gallery-thumbs">${thumbs}</div>` : ''}
+          <div class="section-gallery-main" id="sg-stage-${s.id}">
+            <img class="sg-photo active" id="sg-img-${s.id}" src="/uploads/${cur.filename}" alt="" loading="lazy">
+            ${many ? `<button class="section-gallery-nav prev" onclick="sgPrev(${s.id})" aria-label="Назад">&#8249;</button>` : ''}
+            <button class="section-gallery-zoom" onclick="openGiftPhoto('/uploads/${cur.filename}')"
+                    id="sg-zoom-${s.id}" aria-label="Увеличить">🔍</button>
+            ${many ? `<button class="section-gallery-nav next" onclick="sgNext(${s.id})" aria-label="Вперёд">&#8250;</button>` : ''}
           </div>
+          ${many ? `<div class="section-gallery-thumbs">${thumbs}</div>` : ''}
+          ${dots}
         </div>`;
     }
 
-    function sgToggle(id) {
-      const body  = document.getElementById(`sg-body-${id}`);
-      const arrow = document.getElementById(`sg-arrow-${id}`);
-      const open  = body.style.display === 'none';
-      body.style.display = open ? '' : 'none';
-      arrow.textContent  = open ? '▴' : '▾';
-    }
-
-    function sgSetPhoto(sId, idx) {
-      _sgState[sId] = idx;
+    // Animated crossfade + slide between photos
+    function sgSetPhoto(sId, idx, dir) {
       const photos = _sgPhotos[sId] || [];
-      const src    = '/uploads/' + photos[idx].filename;
-      const img    = document.getElementById(`sg-img-${sId}`);
-      const zoom   = document.getElementById(`sg-zoom-${sId}`);
-      if (img)  { img.style.opacity = '.4'; img.src = src; img.onload = () => img.style.opacity = '1'; }
-      if (zoom) { zoom.onclick = () => openGiftPhoto(src); }
-      document.querySelectorAll(`#sg-body-${sId} .section-gallery-thumb`).forEach((t, i) =>
-        t.classList.toggle('active', i === idx));
+      if (!photos.length || idx === _sgState[sId]) return;
+      const oldIdx = _sgState[sId];
+      if (dir === undefined) dir = idx > oldIdx ? 1 : -1;
+      _sgState[sId] = idx;
+
+      const src   = '/uploads/' + photos[idx].filename;
+      const stage = document.getElementById(`sg-stage-${sId}`);
+      if (!stage) return;
+      const oldImg = stage.querySelector('.sg-photo.active');
+
+      const newImg = document.createElement('img');
+      newImg.className = 'sg-photo';
+      newImg.src = src;
+      newImg.alt = '';
+      newImg.style.transform = `translateX(${dir * 34}px)`;
+      stage.insertBefore(newImg, stage.firstChild); // keep nav/zoom on top in DOM order
+      void newImg.offsetWidth;                       // force reflow so transition runs
+
+      requestAnimationFrame(() => {
+        newImg.classList.add('active');
+        newImg.style.transform = 'translateX(0)';
+        if (oldImg) {
+          oldImg.classList.remove('active');
+          oldImg.style.transform = `translateX(${-dir * 34}px)`;
+        }
+      });
+      const cleanup = () => { if (oldImg && oldImg.parentNode) oldImg.parentNode.removeChild(oldImg); };
+      newImg.addEventListener('transitionend', cleanup, { once: true });
+      setTimeout(cleanup, 700); // safety fallback
+
+      newImg.id = `sg-img-${sId}`;
+      if (oldImg) oldImg.removeAttribute('id');
+
+      const zoom = document.getElementById(`sg-zoom-${sId}`);
+      if (zoom) zoom.onclick = () => openGiftPhoto(src);
+      document.querySelectorAll(`#sg-${sId} .section-gallery-thumb`).forEach((t, i) => t.classList.toggle('active', i === idx));
+      document.querySelectorAll(`#sg-${sId} .sg-dot`).forEach((d, i) => d.classList.toggle('active', i === idx));
     }
 
     function sgPrev(sId) {
       const n = (_sgPhotos[sId] || []).length;
-      sgSetPhoto(sId, (_sgState[sId] - 1 + n) % n);
+      sgSetPhoto(sId, (_sgState[sId] - 1 + n) % n, -1);
     }
     function sgNext(sId) {
       const n = (_sgPhotos[sId] || []).length;
-      sgSetPhoto(sId, (_sgState[sId] + 1) % n);
+      sgSetPhoto(sId, (_sgState[sId] + 1) % n, 1);
     }
 
     async function pickGift(id) {
@@ -591,13 +613,38 @@
     }
 
     // ──────────────────────────────────────────────
+    // ATTENDANCE ("Приду / Не приду")
+    // ──────────────────────────────────────────────
+    let _data = null;
+    let musicInited = false;
+
+    async function setAttendance(val) {
+      try {
+        await api.saveAttendance({ attending: val });
+      } catch (e) {
+        console.error('attendance save failed:', e);
+      }
+      if (_data) {
+        _data.attending = val;
+        await renderPage(_data);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+
+    // ──────────────────────────────────────────────
     // RENDER PAGE
     // ──────────────────────────────────────────────
     async function renderPage(data) {
+      _data = data;
       const { guests, role, sections, friend_response: fr,
               family_responses: fmResponses,
               cottage_date_from, cottage_date_to, page_subtitle,
-              header_text, footer_text } = data;
+              header_text, footer_text, attending,
+              decline_text: declineText, labels } = data;
+
+      // Editable checkbox labels (with fallbacks)
+      const L = labels || {};
+      const lbl = (k, def) => (L[k] && L[k].trim()) ? L[k] : def;
 
       // Store fixed arrival date for saving
       cottageArrivalDate = cottage_date_from || '';
@@ -632,6 +679,34 @@
         </div>
       `;
 
+      // ── Attendance gate ──
+      // Until the guest chooses "Приду", the page content is hidden.
+      if (attending !== true) {
+        if (attending === false) {
+          html += `
+            <div class="invite-section attend-block reveal">
+              <div class="attend-decline">${escapeHtml(declineText || 'Очень жаль, что вы не сможете быть с нами.')}</div>
+              <div class="attend-actions">
+                <button class="btn-attend yes" onclick="setAttendance(true)">Приду</button>
+              </div>
+            </div>`;
+        } else {
+          html += `
+            <div class="invite-section attend-block reveal">
+              <p class="attend-q">Сможете присоединиться к нам?</p>
+              <div class="attend-actions">
+                <button class="btn-attend yes" onclick="setAttendance(true)">Приду</button>
+                <button class="btn-attend no" onclick="setAttendance(false)">Не приду</button>
+              </div>
+            </div>`;
+        }
+        html += `</div>`; // invite-page
+        document.getElementById('page-content').innerHTML = html;
+        setupReveal();
+        if (getToken() && !musicInited) { musicInited = true; await initMusic(); }
+        return;
+      }
+
       // Content sections
       for (const s of sections) {
         html += `<div class="invite-section">`;
@@ -661,14 +736,14 @@
             <label class="option-card">
               <span class="option-icon">🏡</span>
               <span class="option-body">
-                <span class="option-title">Еду в коттедж</span>
-                <span class="option-desc">Загородный отдых с ночёвкой</span>
+                <span class="option-title">${lbl('label_cottage_title', 'Еду в коттедж')}</span>
+                <span class="option-desc">${lbl('label_cottage_desc', 'Загородный отдых с ночёвкой')}</span>
               </span>
               <input type="checkbox" id="going-cottage" class="option-input" ${fd.going_cottage ? 'checked' : ''}>
               <span class="option-check"></span>
             </label>
 
-            <div id="cottage-dates-wrap" style="display:${fd.going_cottage ? 'block' : 'none'}">
+            <div id="cottage-dates-wrap" class="option-reveal" style="display:${fd.going_cottage ? 'block' : 'none'}">
               ${arrivalLabel}
               <label style="font-size:.85rem;color:#555;font-weight:bold;display:block;margin-bottom:8px">Выберите дату выезда</label>
               <div id="cottage-picker"></div>
@@ -677,14 +752,14 @@
             <label class="option-card mt-16">
               <span class="option-icon">🏆</span>
               <span class="option-body">
-                <span class="option-title">Участвую в турнире</span>
-                <span class="option-desc">Дружеские соревнования</span>
+                <span class="option-title">${lbl('label_tournament_title', 'Участвую в турнире')}</span>
+                <span class="option-desc">${lbl('label_tournament_desc', 'Дружеские соревнования')}</span>
               </span>
               <input type="checkbox" id="tournament" class="option-input" ${fd.tournament ? 'checked' : ''}>
               <span class="option-check"></span>
             </label>
 
-            <div id="opponent-wrap" style="display:${fd.tournament ? 'block' : 'none'}">
+            <div id="opponent-wrap" class="option-reveal" style="display:${fd.tournament ? 'block' : 'none'}">
               <div class="form-group">
                 <label>Желаемый соперник в 1-м раунде</label>
                 <select class="form-control" id="preferred-opponent">
@@ -736,18 +811,18 @@
               <label class="option-card">
                 <span class="option-icon">🏙</span>
                 <span class="option-body">
-                  <span class="option-title">Еду в лофт</span>
-                  <span class="option-desc">Празднование в лофте</span>
+                  <span class="option-title">${lbl('label_loft_title', 'Еду в лофт')}</span>
+                  <span class="option-desc">${lbl('label_loft_desc', 'Празднование в лофте')}</span>
                 </span>
                 <input type="checkbox" class="option-input loft-going" data-guest="${g.id}" ${going ? 'checked' : ''}>
                 <span class="option-check"></span>
               </label>
-              <div class="transport-wrap" data-guest="${g.id}" style="display:${going ? 'block' : 'none'}">
+              <div class="transport-wrap option-reveal" data-guest="${g.id}" style="display:${going ? 'block' : 'none'}">
                 <label class="option-card">
                   <span class="option-icon">🚌</span>
                   <span class="option-body">
-                    <span class="option-title">Нужен транспорт до лофта</span>
-                    <span class="option-desc">Организованный трансфер</span>
+                    <span class="option-title">${lbl('label_transport_title', 'Нужен транспорт до лофта')}</span>
+                    <span class="option-desc">${lbl('label_transport_desc', 'Организованный трансфер')}</span>
                   </span>
                   <input type="checkbox" class="option-input loft-transport" data-guest="${g.id}" ${transp ? 'checked' : ''}>
                   <span class="option-check"></span>
@@ -769,6 +844,9 @@
           <div class="gifts-body"></div>
         </div>`;
       }
+
+      // Discreet way to change the answer back to "Не приду"
+      html += `<div class="attend-change"><button onclick="setAttendance(false)">Не смогу прийти</button></div>`;
 
       html += `</div>`; // invite-page
       document.getElementById('page-content').innerHTML = html;
@@ -853,8 +931,8 @@
         await reloadGifts();
       }
 
-      // Music
-      if (getToken()) await initMusic();
+      // Music (init once; survives re-renders since audio lives outside page-content)
+      if (getToken() && !musicInited) { musicInited = true; await initMusic(); }
     }
 
     // ──────────────────────────────────────────────

@@ -1599,6 +1599,98 @@ table.guests-table tbody tr { cursor: pointer; transition: background .12s; }
 }
 .invite-body .transport-wrap { margin-top: 12px; padding-left: 20px; }
 
+/* Indented reveal for content that appears after a checkbox is ticked */
+.invite-body .option-reveal {
+  margin-top: 12px;
+  padding-left: 20px;
+  border-left: 2px solid #ececeb;
+  margin-left: 4px;
+}
+
+/* ===== SECTION GALLERY (always visible + animated) ===== */
+.invite-body .section-gallery { margin-top: 16px; }
+.invite-body .section-gallery-main {
+  position: relative;
+  height: 340px;
+  max-height: 66vh;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #111;
+  display: block;
+}
+.invite-body .sg-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity .45s ease, transform .45s cubic-bezier(.22,.61,.36,1);
+  z-index: 1;
+  display: block;
+}
+.invite-body .sg-photo.active { opacity: 1; }
+.invite-body .section-gallery-nav,
+.invite-body .section-gallery-zoom { z-index: 3; }
+.invite-body .sg-dots { display: flex; justify-content: center; gap: 7px; margin-top: 12px; }
+.invite-body .sg-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #d2d2d0; cursor: pointer;
+  transition: background .2s, transform .2s;
+}
+.invite-body .sg-dot.active { background: var(--gray); transform: scale(1.3); }
+@media (prefers-reduced-motion: reduce) {
+  .invite-body .sg-photo { transition: opacity .2s ease; }
+}
+
+/* ===== ATTENDANCE GATE (Приду / Не приду) ===== */
+.invite-body .attend-block { text-align: center; border-bottom: none; }
+.invite-body .attend-q {
+  font-family: var(--serif);
+  font-size: 1.6rem;
+  color: var(--ink);
+  margin-bottom: 26px;
+}
+.invite-body .attend-actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+.invite-body .btn-attend {
+  font-family: var(--sans);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: .02em;
+  padding: 14px 42px;
+  border-radius: 40px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform .12s ease, box-shadow .2s, background .2s, border-color .2s, color .2s;
+}
+.invite-body .btn-attend.yes {
+  background: #4a8c4a; color: #fff;
+  box-shadow: 0 8px 20px rgba(74,140,74,.28);
+}
+.invite-body .btn-attend.yes:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(74,140,74,.34); }
+.invite-body .btn-attend.no { background: #fff; color: var(--gray-d); border-color: #d8d8d6; }
+.invite-body .btn-attend.no:hover { background: #f5f5f4; border-color: #c4c4c2; }
+.invite-body .attend-decline {
+  font-family: var(--serif);
+  font-size: 1.3rem;
+  line-height: 1.6;
+  color: var(--ink-2);
+  max-width: 520px;
+  margin: 0 auto 26px;
+  white-space: pre-wrap;
+}
+.invite-body .attend-change { text-align: center; margin: 12px 0 8px; }
+.invite-body .attend-change button {
+  background: none; border: none; cursor: pointer;
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: .88rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color .2s;
+}
+.invite-body .attend-change button:hover { color: var(--gray-d); }
+
 /* ===== MOBILE ===== */
 @media (max-width: 768px) {
   .invite-body .invite-page { padding: 40px 16px 16px; }
