@@ -180,6 +180,20 @@ func GetInvitePage(c *gin.Context) {
 		}
 	}
 
+	// Per-guest family responses — needed for group invitations so that each
+	// member's "loft / transport" answers are stored and shown individually.
+	famResponses := gin.H{}
+	if role == "family" {
+		for _, g := range guests {
+			var gl, nt bool
+			if err := db.DB.QueryRow(
+				`SELECT going_loft, needs_transport FROM family_responses WHERE guest_id=$1`, g.ID,
+			).Scan(&gl, &nt); err == nil {
+				famResponses[strconv.Itoa(g.ID)] = gin.H{"going_loft": gl, "needs_transport": nt}
+			}
+		}
+	}
+
 	// Cottage date range from settings
 	var cottageFrom, cottageTo string
 	db.DB.QueryRow(`SELECT value FROM admin_settings WHERE key='cottage_date_from'`).Scan(&cottageFrom)
@@ -218,6 +232,7 @@ func GetInvitePage(c *gin.Context) {
 		"sections":          sections,
 		"friend_response":   friendResp,
 		"family_response":   familyResp,
+		"family_responses":  famResponses,
 		"cottage_date_from": cottageFrom,
 		"cottage_date_to":   cottageTo,
 		"page_subtitle":     pageSubtitle,
@@ -269,33 +284,77 @@ func SaveFriendResponse(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
-// SaveFamilyResponse saves/updates family guest's form response
+// SaveFamilyResponse saves/updates family form responses.
+// Supports both a single answer (legacy) and a per-guest array `responses`
+// for group invitations. Callers may only save answers for themselves or for
+// members of their own group.
 func SaveFamilyResponse(c *gin.Context) {
 	guestIDVal, _ := c.Get("user_id")
 	guestID := guestIDVal.(int)
 
 	var req struct {
-		GoingLoft      bool `json:"going_loft"`
-		NeedsTransport bool `json:"needs_transport"`
+		// legacy single-guest form
+		GoingLoft      *bool `json:"going_loft"`
+		NeedsTransport *bool `json:"needs_transport"`
+		// per-guest form (group invitations)
+		Responses []struct {
+			GuestID        int  `json:"guest_id"`
+			GoingLoft      bool `json:"going_loft"`
+			NeedsTransport bool `json:"needs_transport"`
+		} `json:"responses"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	_, err := db.DB.Exec(`
-		INSERT INTO family_responses (guest_id, going_loft, needs_transport, updated_at)
-		VALUES ($1,$2,$3,NOW())
-		ON CONFLICT (guest_id) DO UPDATE SET
-			going_loft=EXCLUDED.going_loft,
-			needs_transport=EXCLUDED.needs_transport,
-			updated_at=NOW()`,
-		guestID, req.GoingLoft, req.NeedsTransport,
-	)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+	// Build the set of guest IDs this caller is allowed to write: themselves
+	// plus everyone in the same group.
+	allowed := map[int]bool{guestID: true}
+	var groupID *int
+	db.DB.QueryRow(`SELECT group_id FROM guests WHERE id=$1`, guestID).Scan(&groupID)
+	if groupID != nil {
+		if rows, err := db.DB.Query(`SELECT id FROM guests WHERE group_id=$1`, *groupID); err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var id int
+				rows.Scan(&id)
+				allowed[id] = true
+			}
+		}
 	}
+
+	upsert := func(gid int, gl, nt bool) error {
+		_, err := db.DB.Exec(`
+			INSERT INTO family_responses (guest_id, going_loft, needs_transport, updated_at)
+			VALUES ($1,$2,$3,NOW())
+			ON CONFLICT (guest_id) DO UPDATE SET
+				going_loft=EXCLUDED.going_loft,
+				needs_transport=EXCLUDED.needs_transport,
+				updated_at=NOW()`,
+			gid, gl, nt,
+		)
+		return err
+	}
+
+	if len(req.Responses) > 0 {
+		for _, r := range req.Responses {
+			if !allowed[r.GuestID] {
+				continue // silently skip guests outside the caller's group
+			}
+			if err := upsert(r.GuestID, r.GoingLoft, r.NeedsTransport); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+		}
+	} else if req.GoingLoft != nil {
+		nt := req.NeedsTransport != nil && *req.NeedsTransport
+		if err := upsert(guestID, *req.GoingLoft, nt); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 

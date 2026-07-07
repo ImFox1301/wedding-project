@@ -1527,6 +1527,78 @@ table.guests-table tbody tr { cursor: pointer; transition: background .12s; }
   word-break: break-word;
 }
 
+/* ===== RSVP OPTION CARDS (checkbox redesign) ===== */
+.invite-body .option-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #fff;
+  border: 1px solid #e4e4e2;
+  border-radius: 14px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color .2s, background .2s, box-shadow .2s;
+  position: relative;
+}
+.invite-body .option-card:hover { border-color: #cfcfcd; box-shadow: 0 2px 12px rgba(0,0,0,.05); }
+.invite-body .option-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  background: #f4f4f2;
+  transition: background .2s;
+}
+.invite-body .option-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.invite-body .option-title { font-size: 1rem; font-weight: 600; color: var(--ink); }
+.invite-body .option-desc { font-size: .82rem; color: var(--muted); }
+.invite-body .option-input { position: absolute; opacity: 0; width: 0; height: 0; }
+.invite-body .option-check {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  border: 2px solid #d2d2d0;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .2s, border-color .2s;
+}
+.invite-body .option-check::after {
+  content: '';
+  width: 6px;
+  height: 11px;
+  border: solid #fff;
+  border-width: 0 2.5px 2.5px 0;
+  margin-top: -2px;
+  transform: rotate(45deg) scale(0);
+  transition: transform .18s ease;
+}
+.invite-body .option-input:checked ~ .option-check { background: #4a8c4a; border-color: #4a8c4a; }
+.invite-body .option-input:checked ~ .option-check::after { transform: rotate(45deg) scale(1); }
+.invite-body .option-input:focus-visible ~ .option-check { box-shadow: 0 0 0 3px rgba(74,140,74,.25); }
+/* Highlight the whole card when selected (progressive enhancement) */
+.invite-body .option-card:has(.option-input:checked) { border-color: #a4d3a5; background: #f4faf4; }
+.invite-body .option-card:has(.option-input:checked) .option-icon { background: #e4f2e4; }
+
+/* Per-guest RSVP grouping */
+.invite-body .rsvp-people { display: flex; flex-direction: column; gap: 22px; }
+.invite-body .rsvp-person-name {
+  font-family: var(--serif);
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 12px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid #ececeb;
+}
+.invite-body .transport-wrap { margin-top: 12px; padding-left: 20px; }
+
 /* ===== MOBILE ===== */
 @media (max-width: 768px) {
   .invite-body .invite-page { padding: 40px 16px 16px; }

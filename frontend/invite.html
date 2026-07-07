@@ -552,10 +552,16 @@
     }
 
     async function saveFamilyForm() {
-      const going     = document.getElementById('going-loft').checked;
-      const transport = document.getElementById('needs-transport').checked;
+      const responses = [];
+      document.querySelectorAll('.loft-going').forEach(cb => {
+        const gid       = parseInt(cb.dataset.guest);
+        const going     = cb.checked;
+        const tcb       = document.querySelector(`.loft-transport[data-guest="${cb.dataset.guest}"]`);
+        const transport = going && !!(tcb && tcb.checked);
+        responses.push({ guest_id: gid, going_loft: going, needs_transport: transport });
+      });
       try {
-        await api.saveFamily({ going_loft: going, needs_transport: transport });
+        await api.saveFamily({ responses });
         showSaveStatus(true);
       } catch (e) {
         console.error('saveFamily failed:', e);
@@ -588,7 +594,8 @@
     // RENDER PAGE
     // ──────────────────────────────────────────────
     async function renderPage(data) {
-      const { guests, role, sections, friend_response: fr, family_response: fmr,
+      const { guests, role, sections, friend_response: fr,
+              family_responses: fmResponses,
               cottage_date_from, cottage_date_to, page_subtitle,
               header_text, footer_text } = data;
 
@@ -651,12 +658,15 @@
           <h2>📋 Ваши ответы</h2>
           <form class="guest-form" id="friend-form">
 
-            <div class="form-group">
-              <label class="checkbox-label">
-                <input type="checkbox" id="going-cottage" ${fd.going_cottage ? 'checked' : ''}>
-                <span>🏡 Еду в коттедж</span>
-              </label>
-            </div>
+            <label class="option-card">
+              <span class="option-icon">🏡</span>
+              <span class="option-body">
+                <span class="option-title">Еду в коттедж</span>
+                <span class="option-desc">Загородный отдых с ночёвкой</span>
+              </span>
+              <input type="checkbox" id="going-cottage" class="option-input" ${fd.going_cottage ? 'checked' : ''}>
+              <span class="option-check"></span>
+            </label>
 
             <div id="cottage-dates-wrap" style="display:${fd.going_cottage ? 'block' : 'none'}">
               ${arrivalLabel}
@@ -664,12 +674,15 @@
               <div id="cottage-picker"></div>
             </div>
 
-            <div class="form-group mt-16">
-              <label class="checkbox-label">
-                <input type="checkbox" id="tournament" ${fd.tournament ? 'checked' : ''}>
-                <span>🏆 Участвую в турнире</span>
-              </label>
-            </div>
+            <label class="option-card mt-16">
+              <span class="option-icon">🏆</span>
+              <span class="option-body">
+                <span class="option-title">Участвую в турнире</span>
+                <span class="option-desc">Дружеские соревнования</span>
+              </span>
+              <input type="checkbox" id="tournament" class="option-input" ${fd.tournament ? 'checked' : ''}>
+              <span class="option-check"></span>
+            </label>
 
             <div id="opponent-wrap" style="display:${fd.tournament ? 'block' : 'none'}">
               <div class="form-group">
@@ -708,28 +721,46 @@
         </div>`;
       }
 
-      // ── Family form ──
+      // ── Family form (per-guest — each member answers separately) ──
       if (role === 'family') {
-        const fmd = fmr || {};
+        const responses = fmResponses || {};
+        const multi = guests.length > 1;
+        const peopleHtml = guests.map(g => {
+          const resp  = responses[g.id] || {};
+          const going = !!resp.going_loft;
+          const transp = !!resp.needs_transport;
+          const name  = [g.first_name, g.last_name].filter(Boolean).join(' ');
+          return `
+            <div class="rsvp-person">
+              ${multi ? `<div class="rsvp-person-name">${name}</div>` : ''}
+              <label class="option-card">
+                <span class="option-icon">🏙</span>
+                <span class="option-body">
+                  <span class="option-title">Еду в лофт</span>
+                  <span class="option-desc">Празднование в лофте</span>
+                </span>
+                <input type="checkbox" class="option-input loft-going" data-guest="${g.id}" ${going ? 'checked' : ''}>
+                <span class="option-check"></span>
+              </label>
+              <div class="transport-wrap" data-guest="${g.id}" style="display:${going ? 'block' : 'none'}">
+                <label class="option-card">
+                  <span class="option-icon">🚌</span>
+                  <span class="option-body">
+                    <span class="option-title">Нужен транспорт до лофта</span>
+                    <span class="option-desc">Организованный трансфер</span>
+                  </span>
+                  <input type="checkbox" class="option-input loft-transport" data-guest="${g.id}" ${transp ? 'checked' : ''}>
+                  <span class="option-check"></span>
+                </label>
+              </div>
+            </div>`;
+        }).join('');
+
         html += `
         <div class="invite-section">
           <h2>📋 Ваши ответы</h2>
-          <form class="guest-form" id="family-form">
-            <div class="form-group">
-              <label class="checkbox-label">
-                <input type="checkbox" id="going-loft" ${fmd.going_loft ? 'checked' : ''}>
-                <span>🏙 Еду в лофт</span>
-              </label>
-            </div>
-            <div id="transport-wrap" style="display:${fmd.going_loft ? 'block' : 'none'}">
-              <div class="form-group">
-                <label class="checkbox-label">
-                  <input type="checkbox" id="needs-transport" ${fmd.needs_transport ? 'checked' : ''}>
-                  <span>🚌 Нужен транспорт до лофта</span>
-                </label>
-              </div>
-            </div>
-          </form>
+          ${multi ? '<p class="text-muted mb-16">Отметьте, пожалуйста, ответ для каждого гостя.</p>' : ''}
+          <div class="rsvp-people">${peopleHtml}</div>
         </div>
 
         <div class="invite-section" id="gifts-section">
@@ -806,13 +837,16 @@
       }
 
       if (role === 'family') {
-        const goingLoft     = document.getElementById('going-loft');
-        const transportWrap = document.getElementById('transport-wrap');
-        goingLoft.addEventListener('change', () => {
-          transportWrap.style.display = goingLoft.checked ? 'block' : 'none';
-          saveFamilyForm();
+        // Per-guest loft toggle reveals that guest's transport option
+        document.querySelectorAll('.loft-going').forEach(cb => {
+          cb.addEventListener('change', () => {
+            const tw = document.querySelector(`.transport-wrap[data-guest="${cb.dataset.guest}"]`);
+            if (tw) tw.style.display = cb.checked ? 'block' : 'none';
+            saveFamilyForm();
+          });
         });
-        document.getElementById('needs-transport').addEventListener('change', saveFamilyForm);
+        document.querySelectorAll('.loft-transport').forEach(cb =>
+          cb.addEventListener('change', saveFamilyForm));
 
         // Gifts for family
         giftsContainer = document.getElementById('gifts-section');
