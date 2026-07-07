@@ -4,9 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Приглашение</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@300;400;500;600&display=swap&subset=cyrillic,latin">
   <link rel="stylesheet" href="/css/style.css">
 </head>
-<body>
+<body class="invite-body">
   <header>
     <a class="logo" href="#">💍 Свадьба</a>
     <div class="user-info">
@@ -24,27 +28,42 @@
 
   <div id="music-fab-wrap" class="hidden">
     <!-- FAB toggle button -->
-    <button id="music-fab-btn" onclick="toggleMusicWidget()" aria-label="Плеер">🎵</button>
+    <button id="music-fab-btn" onclick="toggleMusicWidget()" aria-label="Плеер">
+      <svg viewBox="0 0 24 24" width="23" height="23" fill="currentColor" aria-hidden="true">
+        <path d="M20 3.5a1 1 0 0 0-1.2-.98l-9 1.8A1 1 0 0 0 9 5.3v9.2A3.5 3.5 0 1 0 11 17.5V9.32l7-1.4v4.08A3.5 3.5 0 1 0 20 15V3.5z"/>
+      </svg>
+    </button>
 
-    <!-- Widget panel -->
+    <!-- Widget panel (Apple Music style) -->
     <div id="music-widget" class="hidden">
-      <!-- Track list (scrollable, 4/5) -->
-      <div id="music-track-list"></div>
+      <!-- Now playing -->
+      <div id="music-np">
+        <div id="music-np-art"><span class="np-note">♪</span></div>
+        <div id="music-np-meta">
+          <div id="music-current-name">—</div>
+          <div id="music-current-artist"></div>
+        </div>
+      </div>
 
-      <!-- Controls bar (1/5) -->
-      <div id="music-controls">
-        <div id="music-current-name"></div>
-        <div id="music-progress-wrap">
-          <div id="music-progress-bar"><div id="music-progress-fill"></div></div>
+      <!-- Scrubber -->
+      <div id="music-scrubber">
+        <div id="music-progress-bar"><div id="music-progress-fill"></div></div>
+        <div class="music-times">
           <span id="music-time-cur">0:00</span>
           <span id="music-time-dur">0:00</span>
         </div>
-        <div id="music-btns">
-          <button onclick="prevTrack()">⏮</button>
-          <button id="play-btn" onclick="togglePlay()">▶</button>
-          <button onclick="nextTrack()">⏭</button>
-        </div>
       </div>
+
+      <!-- Transport -->
+      <div id="music-btns">
+        <button class="mc-side" onclick="prevTrack()" aria-label="Предыдущий">⏮</button>
+        <button id="play-btn" onclick="togglePlay()" aria-label="Играть">▶</button>
+        <button class="mc-side" onclick="nextTrack()" aria-label="Следующий">⏭</button>
+      </div>
+
+      <!-- Playlist -->
+      <div id="music-list-header">Плейлист</div>
+      <div id="music-track-list"></div>
     </div>
   </div>
 
@@ -75,6 +94,12 @@
     // ──────────────────────────────────────────────
     // TEMPLATE
     // ──────────────────────────────────────────────
+    function escapeHtml(s) {
+      return (s || '').replace(/[&<>"']/g, m => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]
+      ));
+    }
+
     function applyTemplate(text, guests) {
       if (!guests || !guests.length) return text;
       const g = guests[0];
@@ -137,9 +162,17 @@
     const widget    = document.getElementById('music-widget');
     const trackList = document.getElementById('music-track-list');
     const curName   = document.getElementById('music-current-name');
+    const curArtist = document.getElementById('music-current-artist');
+    const npArt     = document.getElementById('music-np-art');
     const progFill  = document.getElementById('music-progress-fill');
     const timeCur   = document.getElementById('music-time-cur');
     const timeDur   = document.getElementById('music-time-dur');
+
+    // Colorful "album art" placeholder, deterministic per track index
+    function artGradient(i) {
+      const h = (i * 63) % 360;
+      return `linear-gradient(135deg, hsl(${h}, 62%, 64%), hsl(${(h + 38) % 360}, 66%, 46%))`;
+    }
 
     function fmtTime(s) {
       if (!isFinite(s)) return '0:00';
@@ -163,13 +196,17 @@
     function renderTrackList() {
       trackList.innerHTML = tracks.map((t, i) => {
         const { title, artist } = getTrackMeta(t);
-        const active = i === trackIdx ? ' music-track-active' : '';
-        return `<div class="music-track-item${active}" onclick="loadTrack(${i});startPlay()">
-          <span class="music-track-num">${i + 1}</span>
-          <span class="music-track-text">
+        const isActive = i === trackIdx;
+        const cls = 'music-track-item' + (isActive ? ' music-track-active' : '');
+        const overlay = (isActive && playing)
+          ? '<span class="eq"><i></i><i></i><i></i></span>'
+          : '<span class="mt-note">♪</span>';
+        return `<div class="${cls}" onclick="loadTrack(${i});startPlay()">
+          <div class="mt-art" style="background:${artGradient(i)}">${overlay}</div>
+          <div class="music-track-text">
             <span class="music-track-title">${title}</span>
             ${artist ? `<span class="music-track-artist">${artist}</span>` : ''}
-          </span>
+          </div>
         </div>`;
       }).join('');
     }
@@ -178,8 +215,11 @@
       const t = tracks[trackIdx];
       if (!t) return;
       const meta = getTrackMeta(t);
-      curName.textContent = meta.title + (meta.artist ? ' — ' + meta.artist : '');
+      curName.textContent = meta.title;
+      if (curArtist) curArtist.textContent = meta.artist || 'Неизвестный исполнитель';
+      if (npArt) npArt.style.background = artGradient(trackIdx);
       playBtn.textContent = playing ? '⏸' : '▶';
+      playBtn.classList.toggle('is-playing', playing);
       renderTrackList();
       // Scroll active track into view
       const active = trackList.querySelector('.music-track-active');
@@ -265,13 +305,20 @@
       if (canPress) {
         btn.onclick = () => { btn.textContent = '🎉 ТЫ ГОША!!!'; btn.style.background = '#27ae60'; btn.disabled = true; };
       } else {
-        // Capture natural position before switching to fixed, then clamp into viewport
+        // Capture natural position, then re-parent to <body> so position:fixed is
+        // always relative to the viewport (never a transformed/positioned ancestor),
+        // and clamp into the viewport with a small safety margin.
+        const M = 8; // keep-on-screen margin
         const initR = btn.getBoundingClientRect();
-        const initLeft = Math.max(0, Math.min(window.innerWidth  - btn.offsetWidth,  initR.left));
-        const initTop  = Math.max(0, Math.min(window.innerHeight - btn.offsetHeight, initR.top));
+        const w = btn.offsetWidth, h = btn.offsetHeight;
+        const clampX = x => Math.max(M, Math.min(window.innerWidth  - w - M, x));
+        const clampY = y => Math.max(M, Math.min(window.innerHeight - h - M, y));
+        document.body.appendChild(btn);
         btn.style.position = 'fixed';
-        btn.style.left = initLeft + 'px';
-        btn.style.top  = initTop  + 'px';
+        btn.style.margin = '0';
+        btn.style.zIndex = '400';
+        btn.style.left = clampX(initR.left) + 'px';
+        btn.style.top  = clampY(initR.top)  + 'px';
 
         function flee(e) {
           const r  = btn.getBoundingClientRect();
@@ -279,10 +326,8 @@
           const my = e.clientY || (e.touches && e.touches[0]?.clientY) || r.top  + r.height/2;
           const dx = (r.left + r.width/2) - mx, dy = (r.top + r.height/2) - my;
           const d  = Math.sqrt(dx*dx + dy*dy) || 1;
-          let nx = r.left + dx/d*160, ny = r.top + dy/d*160;
-          nx = Math.max(0, Math.min(window.innerWidth  - r.width,  nx));
-          ny = Math.max(0, Math.min(window.innerHeight - r.height, ny));
-          btn.style.left = nx + 'px'; btn.style.top = ny + 'px';
+          btn.style.left = clampX(r.left + dx/d*160) + 'px';
+          btn.style.top  = clampY(r.top  + dy/d*160) + 'px';
         }
         btn.addEventListener('mousemove', flee);
         btn.addEventListener('touchmove', flee, { passive: true });
@@ -519,6 +564,27 @@
     }
 
     // ──────────────────────────────────────────────
+    // SCROLL REVEAL (fade-up on enter)
+    // ──────────────────────────────────────────────
+    function setupReveal() {
+      const els = document.querySelectorAll('.invite-header, .invite-section');
+      if (!('IntersectionObserver' in window)) {
+        els.forEach(el => el.classList.add('reveal-in'));
+        return;
+      }
+      const io = new IntersectionObserver((entries, obs) => {
+        entries.forEach(e => {
+          if (e.isIntersecting) { e.target.classList.add('reveal-in'); obs.unobserve(e.target); }
+        });
+      }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+      els.forEach((el, i) => {
+        el.classList.add('reveal');
+        el.style.setProperty('--reveal-delay', (Math.min(i, 6) * 60) + 'ms');
+        io.observe(el);
+      });
+    }
+
+    // ──────────────────────────────────────────────
     // RENDER PAGE
     // ──────────────────────────────────────────────
     async function renderPage(data) {
@@ -549,8 +615,12 @@
 
       // Header
       html += `
-        <div class="invite-header">
+        <div class="invite-header reveal">
+          <span class="invite-eyebrow">Приглашение</span>
           <h1>${salutation}!</h1>
+          <div class="invite-ornament" aria-hidden="true">
+            <span class="line"></span><span class="dot">&#10022;</span><span class="line"></span>
+          </div>
           <p class="subtitle">${subtitle}</p>
         </div>
       `;
@@ -626,6 +696,11 @@
               style="overflow:auto;resize:vertical"
               placeholder="Ваш комментарий...">${fd.comment || ''}</textarea>
           </div>
+          ${fd.admin_reply && fd.admin_reply.trim() ? `
+          <div class="host-reply">
+            <div class="host-reply-head">💌 Ответ организаторов</div>
+            <div class="host-reply-text">${escapeHtml(fd.admin_reply)}</div>
+          </div>` : ''}
         </div>
 
         <div class="gosha-btn-wrap">
@@ -666,6 +741,9 @@
 
       html += `</div>`; // invite-page
       document.getElementById('page-content').innerHTML = html;
+
+      // Entrance animations
+      setupReveal();
 
       // ── Post-render wiring ──
 

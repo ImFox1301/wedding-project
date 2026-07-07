@@ -99,6 +99,10 @@ func main() {
 		admin.GET("/stats/cottage", handlers.StatsCottage)
 		admin.GET("/stats/tournament", handlers.StatsTournament)
 		admin.GET("/stats/loft", handlers.StatsLoft)
+
+		// Comments
+		admin.GET("/comments", handlers.ListComments)
+		admin.PUT("/comments/:guestId/reply", handlers.ReplyComment)
 	}
 
 	// Guest routes (authenticated guests)

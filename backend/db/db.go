@@ -124,6 +124,9 @@ func Migrate() {
 		`ALTER TABLE gifts ADD COLUMN IF NOT EXISTS link_url TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE music_files ADD COLUMN IF NOT EXISTS title  VARCHAR(255) NOT NULL DEFAULT ''`,
 		`ALTER TABLE music_files ADD COLUMN IF NOT EXISTS artist VARCHAR(255) NOT NULL DEFAULT ''`,
+		// Admin reply to a guest's comment
+		`ALTER TABLE friend_responses ADD COLUMN IF NOT EXISTS admin_reply TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE friend_responses ADD COLUMN IF NOT EXISTS admin_reply_at TIMESTAMP`,
 		// Default settings
 		`INSERT INTO admin_settings (key, value) VALUES
 			('cottage_date_from',      ''),

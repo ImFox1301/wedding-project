@@ -136,6 +136,12 @@ const api = {
     loft:       () => api.get('/admin/stats/loft'),
   },
 
+  // Admin - comments
+  comments: {
+    list:  ()                => api.get('/admin/comments'),
+    reply: (guestId, reply)  => api.put('/admin/comments/' + guestId + '/reply', { reply }),
+  },
+
   // Guest
   invite: (token) => fetch(API_BASE + '/invite/' + token).then(r => r.json()),
 

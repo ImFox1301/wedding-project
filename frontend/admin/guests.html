@@ -26,6 +26,7 @@
       <a href="/admin/music.html">Музыка</a>
       <div class="sidebar-section">Аналитика</div>
       <a href="/admin/stats.html">Статистика</a>
+      <a href="/admin/comments.html">Комментарии</a>
       <div class="sidebar-section">Прочее</div>
       <a href="/admin/settings.html">Настройки</a>
     </nav>
@@ -37,32 +38,42 @@
       </div>
       <div id="alert-container"></div>
 
-      <!-- Filter -->
-      <div class="flex gap-8 mb-16" style="flex-wrap:wrap">
-        <select class="form-control" id="filter-role" style="max-width:180px" onchange="filterGuests()">
+      <!-- Summary chips (also act as quick filters) -->
+      <div class="stat-chips" id="stat-chips"></div>
+
+      <!-- Toolbar -->
+      <div class="page-toolbar">
+        <div class="search-box">
+          <input class="form-control" id="filter-search" placeholder="Поиск по имени, логину..." oninput="applyFilters()">
+        </div>
+        <select class="form-control" id="filter-role" onchange="applyFilters()">
           <option value="">Все роли</option>
           <option value="friends">Друзья</option>
           <option value="family">Семья</option>
         </select>
-        <input class="form-control" id="filter-search" placeholder="Поиск по имени/логину..." style="max-width:260px" oninput="filterGuests()">
+        <select class="form-control" id="filter-group" onchange="applyFilters()">
+          <option value="">Все группы</option>
+        </select>
+        <select class="form-control" id="filter-visited" onchange="applyFilters()">
+          <option value="">Любое посещение</option>
+          <option value="yes">Посетили</option>
+          <option value="no">Не посетили</option>
+        </select>
+        <div class="toolbar-spacer"></div>
+        <span class="result-count" id="result-count"></span>
       </div>
 
       <div class="table-wrap">
-        <table>
+        <table class="guests-table">
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Фамилия</th>
-              <th>Имя</th>
-              <th>Отчество</th>
-              <th>Логин</th>
+              <th>Гость</th>
               <th>Роль</th>
               <th>Пол</th>
-              <th>Обращение</th>
-              <th>am_i_gosha</th>
               <th>Группа</th>
+              <th>Обращение</th>
               <th>Посещение</th>
-              <th>Действия</th>
+              <th class="text-right">Действия</th>
             </tr>
           </thead>
           <tbody id="guests-tbody"></tbody>
@@ -75,71 +86,99 @@
 
   <!-- Modal -->
   <div class="modal-overlay" id="modal">
-    <div class="modal">
+    <div class="modal modal-guest">
       <div class="modal-header">
         <h2 id="modal-title">Добавить гостя</h2>
         <button class="modal-close" onclick="closeModal()">&times;</button>
       </div>
+
       <form id="guest-form">
         <input type="hidden" id="guest-id">
-        <div class="form-row">
-          <div class="form-group">
-            <label>Фамилия *</label>
-            <input type="text" class="form-control" id="last-name" required>
-          </div>
-          <div class="form-group">
-            <label>Имя *</label>
-            <input type="text" class="form-control" id="first-name" required>
-          </div>
-          <div class="form-group">
-            <label>Отчество</label>
-            <input type="text" class="form-control" id="middle-name">
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Роль *</label>
-            <select class="form-control" id="role" required onchange="updateGroupAvailability()">
-              <option value="friends">Друзья</option>
-              <option value="family">Семья</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Пол *</label>
-            <select class="form-control" id="gender">
-              <option value="male">Мужской (Дорогой)</option>
-              <option value="female">Женский (Дорогая)</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Группа</label>
-            <select class="form-control" id="group-id" onchange="updateSalutationVisibility()">
-              <option value="">— без группы —</option>
-            </select>
+
+        <!-- Live header -->
+        <div class="modal-guest-head">
+          <span class="g-avatar" id="mg-avatar">?</span>
+          <div>
+            <div class="mgh-name" id="mg-name">Новый гость</div>
+            <div class="mgh-login" id="mg-login"></div>
           </div>
         </div>
 
-        <!-- Hidden when guest is in a group; value is preserved in DB -->
-        <div class="form-group" id="custom-salutation-wrap">
-          <label>Пользовательское обращение
-            <span class="text-muted">(если пусто — «Дорогой Имя» / «Дорогая Имя»)</span>
-          </label>
-          <input type="text" class="form-control" id="custom-salutation"
-            placeholder="Например: Дорогой {{first_name}}, Любимая {{full_name}}...">
-          <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-            <span class="text-muted" style="font-size:.8rem">Вставить:</span>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="insertPattern('{{first_name}}')">{{first_name}}</button>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="insertPattern('{{last_name}}')">{{last_name}}</button>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="insertPattern('{{middle_name}}')">{{middle_name}}</button>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="insertPattern('{{full_name}}')">{{full_name}}</button>
+        <!-- Main data -->
+        <div class="modal-section">
+          <div class="modal-section-title">Основные данные</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Фамилия *</label>
+              <input type="text" class="form-control" id="last-name" required>
+            </div>
+            <div class="form-group">
+              <label>Имя *</label>
+              <input type="text" class="form-control" id="first-name" required>
+            </div>
+            <div class="form-group">
+              <label>Отчество</label>
+              <input type="text" class="form-control" id="middle-name">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Роль *</label>
+              <select class="form-control" id="role" required onchange="updateGroupAvailability()">
+                <option value="friends">Друзья</option>
+                <option value="family">Семья</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Пол *</label>
+              <select class="form-control" id="gender" onchange="updateSalutationPreview()">
+                <option value="male">Мужской (Дорогой)</option>
+                <option value="female">Женский (Дорогая)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Группа</label>
+              <select class="form-control" id="group-id" onchange="updateSalutationVisibility()">
+                <option value="">— без группы —</option>
+              </select>
+            </div>
           </div>
         </div>
-        <div class="form-group">
-          <label class="checkbox-label">
+
+        <!-- Salutation (hidden when guest is in a group) -->
+        <div class="modal-section" id="custom-salutation-wrap">
+          <div class="modal-section-title">Обращение</div>
+          <div class="form-group" style="margin-bottom:0">
+            <label>Пользовательское обращение
+              <span class="form-hint">(если пусто — «Дорогой Имя» / «Дорогая Имя»)</span>
+            </label>
+            <input type="text" class="form-control" id="custom-salutation"
+              placeholder="Например: Дорогой {{first_name}}, Любимая {{full_name}}..."
+              oninput="updateSalutationPreview()">
+            <div class="pattern-btns">
+              <span class="form-hint">Вставить:</span>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="insertPattern('{{first_name}}')">{{first_name}}</button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="insertPattern('{{last_name}}')">{{last_name}}</button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="insertPattern('{{middle_name}}')">{{middle_name}}</button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="insertPattern('{{full_name}}')">{{full_name}}</button>
+            </div>
+            <div class="salu-preview">
+              <div class="sp-label">Гость увидит</div>
+              <div class="sp-text" id="salu-preview-text">Дорогой Имя!</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Extra -->
+        <div class="modal-section">
+          <div class="modal-section-title">Дополнительно</div>
+          <label class="switch">
             <input type="checkbox" id="am-i-gosha">
-            <span>am_i_gosha (я Гоша)</span>
+            <span class="track"></span>
+            <span>Отметить как «Гошу» (am_i_gosha)</span>
           </label>
         </div>
+
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Отмена</button>
           <button type="submit" class="btn btn-primary" id="save-btn">Сохранить</button>
@@ -153,91 +192,190 @@
     requireAdmin();
     function logout() { clearAuth(); window.location.href = '/login.html'; }
 
-    // Disable group select when role is "friends"
+    function esc(s) {
+      return (s || '').replace(/[&<>"']/g, m => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]
+      ));
+    }
+    function val(id) { return document.getElementById(id).value; }
+    function initials(g) {
+      return ((g.last_name || '')[0] || '') + ((g.first_name || '')[0] || '');
+    }
+    function fmtDate(str) {
+      if (!str) return '';
+      const d = new Date(str);
+      if (isNaN(d)) return '';
+      return d.toLocaleString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+
+    // ── Modal field logic ──────────────────────────
     function updateGroupAvailability() {
-      const isFriends = document.getElementById('role').value === 'friends';
+      const isFriends = val('role') === 'friends';
       const groupSel  = document.getElementById('group-id');
-      if (isFriends) {
-        groupSel.value    = '';
-        groupSel.disabled = true;
-      } else {
-        groupSel.disabled = false;
-      }
+      if (isFriends) { groupSel.value = ''; groupSel.disabled = true; }
+      else { groupSel.disabled = false; }
+      // Recolor avatar by role
+      const av = document.getElementById('mg-avatar');
+      av.classList.remove('role-friends', 'role-family');
+      av.classList.add('role-' + val('role'));
       updateSalutationVisibility();
     }
-
-    // Show/hide custom salutation based on whether a group is selected
     function updateSalutationVisibility() {
-      const hasGroup = !!document.getElementById('group-id').value;
+      const hasGroup = !!val('group-id');
       document.getElementById('custom-salutation-wrap').style.display = hasGroup ? 'none' : '';
+      updateSalutationPreview();
     }
-
-    // Insert template pattern at cursor position in the custom salutation field
     function insertPattern(pattern) {
       const input = document.getElementById('custom-salutation');
-      const start = input.selectionStart;
-      const end   = input.selectionEnd;
+      const start = input.selectionStart, end = input.selectionEnd;
       input.value = input.value.slice(0, start) + pattern + input.value.slice(end);
       input.selectionStart = input.selectionEnd = start + pattern.length;
       input.focus();
+      updateSalutationPreview();
+    }
+    function updateSalutationPreview() {
+      const fn = val('first-name'), ln = val('last-name'), mn = val('middle-name');
+      const custom = val('custom-salutation').trim();
+      let out;
+      if (custom) {
+        out = custom
+          .replace(/\{\{first_name\}\}/g, fn)
+          .replace(/\{\{last_name\}\}/g, ln)
+          .replace(/\{\{middle_name\}\}/g, mn)
+          .replace(/\{\{full_name\}\}/g, [ln, fn, mn].filter(Boolean).join(' '));
+      } else {
+        out = (val('gender') === 'female' ? 'Дорогая' : 'Дорогой') + ' ' + (fn || 'Имя');
+      }
+      document.getElementById('salu-preview-text').textContent = out + '!';
+      updateModalHead();
+    }
+    function updateModalHead() {
+      const fn = val('first-name'), ln = val('last-name'), mn = val('middle-name');
+      const fio = [ln, fn, mn].filter(Boolean).join(' ');
+      document.getElementById('mg-name').textContent = fio || 'Новый гость';
+      document.getElementById('mg-avatar').textContent =
+        (((ln || '')[0] || '') + ((fn || '')[0] || '')).toUpperCase() || '?';
     }
 
+    // ── Data ──────────────────────────────────────
     let allGuests = [];
     let allGroups = [];
 
     async function load() {
       try {
         [allGuests, allGroups] = await Promise.all([api.guests.list(), api.groups.list()]);
-        renderGuests(allGuests);
-        fillGroupSelect();
+        fillGroupSelects();
+        applyFilters();
       } catch (err) {
         showAlert(document.getElementById('alert-container'), err.message, 'danger');
       }
     }
 
-    function fillGroupSelect() {
-      const sel = document.getElementById('group-id');
-      const current = sel.value;
-      sel.innerHTML = '<option value="">— без группы —</option>' +
-        allGroups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
-      sel.value = current;
+    function fillGroupSelects() {
+      const modalSel = document.getElementById('group-id');
+      const cur = modalSel.value;
+      modalSel.innerHTML = '<option value="">— без группы —</option>' +
+        allGroups.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join('');
+      modalSel.value = cur;
+
+      const filterSel = document.getElementById('filter-group');
+      const curF = filterSel.value;
+      filterSel.innerHTML = '<option value="">Все группы</option>' +
+        allGroups.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join('');
+      filterSel.value = curF;
     }
 
     const GENDER_LABEL = { male: '♂ Муж.', female: '♀ Жен.' };
 
-    function renderGuests(guests) {
-      const tbody = document.getElementById('guests-tbody');
-      tbody.innerHTML = guests.map(g => `
-        <tr>
-          <td>${g.id}</td>
-          <td>${g.last_name}</td>
-          <td>${g.first_name}</td>
-          <td>${g.middle_name || '—'}</td>
-          <td>${g.login}</td>
-          <td><span class="badge badge-${g.role}">${g.role === 'friends' ? 'Друзья' : 'Семья'}</span></td>
-          <td>${GENDER_LABEL[g.gender] || '♂ Муж.'}</td>
-          <td>${g.custom_salutation || '<span class="text-muted">—</span>'}</td>
-          <td>${g.am_i_gosha ? '✅' : '—'}</td>
-          <td>${g.group_name || '—'}</td>
-          <td>${g.visited ? `<span class="badge badge-visited">Посетил</span>` : `<span class="badge badge-not-visited">Нет</span>`}</td>
-          <td>
-            <button class="btn btn-secondary btn-sm" onclick="editGuest(${g.id})">✏️</button>
-            <button class="btn btn-danger btn-sm" onclick="deleteGuest(${g.id}, '${g.last_name} ${g.first_name}')">🗑</button>
-          </td>
-        </tr>
-      `).join('') || '<tr><td colspan="12" class="text-muted" style="padding:16px;text-align:center">Гостей нет</td></tr>';
+    // ── Filters + summary chips ────────────────────
+    function currentFilters() {
+      return {
+        role:    val('filter-role'),
+        group:   val('filter-group'),
+        visited: val('filter-visited'),
+        search:  val('filter-search').toLowerCase().trim(),
+      };
     }
 
-    function filterGuests() {
-      const role = document.getElementById('filter-role').value;
-      const search = document.getElementById('filter-search').value.toLowerCase();
+    function applyFilters() {
+      const f = currentFilters();
       const filtered = allGuests.filter(g =>
-        (!role || g.role === role) &&
-        (!search || (g.last_name + ' ' + g.first_name + ' ' + g.login).toLowerCase().includes(search))
+        (!f.role    || g.role === f.role) &&
+        (!f.group   || String(g.group_id) === f.group) &&
+        (!f.visited || (f.visited === 'yes' ? g.visited : !g.visited)) &&
+        (!f.search  || (g.last_name + ' ' + g.first_name + ' ' + (g.middle_name || '') + ' ' + g.login).toLowerCase().includes(f.search))
       );
       renderGuests(filtered);
+      renderChips(f);
+      document.getElementById('result-count').textContent =
+        `Показано ${filtered.length} из ${allGuests.length}`;
     }
 
+    function renderChips(f) {
+      const total   = allGuests.length;
+      const friends = allGuests.filter(g => g.role === 'friends').length;
+      const family  = allGuests.filter(g => g.role === 'family').length;
+      const visited = allGuests.filter(g => g.visited).length;
+      const chips = [
+        { key: 'all',     num: total,   lbl: 'Всего',    active: !f.role && !f.visited },
+        { key: 'friends', num: friends, lbl: 'Друзья',   active: f.role === 'friends' },
+        { key: 'family',  num: family,  lbl: 'Семья',    active: f.role === 'family' },
+        { key: 'visited', num: visited, lbl: 'Посетили', active: f.visited === 'yes' },
+      ];
+      document.getElementById('stat-chips').innerHTML = chips.map(c => `
+        <div class="stat-chip ${c.active ? 'active' : ''}" onclick="chipFilter('${c.key}')">
+          <span class="sc-num">${c.num}</span>
+          <span class="sc-lbl">${c.lbl}</span>
+        </div>
+      `).join('');
+    }
+
+    function chipFilter(key) {
+      const roleSel = document.getElementById('filter-role');
+      const visSel  = document.getElementById('filter-visited');
+      if (key === 'all')     { roleSel.value = '';        visSel.value = ''; }
+      if (key === 'friends') { roleSel.value = 'friends'; visSel.value = ''; }
+      if (key === 'family')  { roleSel.value = 'family';  visSel.value = ''; }
+      if (key === 'visited') { visSel.value = 'yes'; }
+      applyFilters();
+    }
+
+    function renderGuests(guests) {
+      const tbody = document.getElementById('guests-tbody');
+      tbody.innerHTML = guests.map(g => {
+        const fio = [g.last_name, g.first_name, g.middle_name].filter(Boolean).join(' ');
+        const goshaChip = g.am_i_gosha ? ' <span class="chip-gosha" title="Гоша">Гоша</span>' : '';
+        const salu = g.custom_salutation
+          ? `<span class="salu" title="${esc(g.custom_salutation)}">${esc(g.custom_salutation)}</span>`
+          : '<span class="text-muted">по умолчанию</span>';
+        const visit = g.visited
+          ? `<span class="badge badge-visited" title="${g.visited_at ? fmtDate(g.visited_at) : ''}">Посетил</span>`
+          : `<span class="badge badge-not-visited">Нет</span>`;
+        return `
+        <tr onclick="editGuest(${g.id})">
+          <td>
+            <div class="g-cell-name">
+              <span class="g-avatar role-${g.role}">${esc(initials(g)).toUpperCase()}</span>
+              <span class="g-name-wrap">
+                <span class="g-name">${esc(fio)}${goshaChip}</span>
+                <span class="g-login">@${esc(g.login)}</span>
+              </span>
+            </div>
+          </td>
+          <td><span class="badge badge-${g.role}">${g.role === 'friends' ? 'Друзья' : 'Семья'}</span></td>
+          <td>${GENDER_LABEL[g.gender] || '♂ Муж.'}</td>
+          <td>${g.group_name ? esc(g.group_name) : '<span class="text-muted">—</span>'}</td>
+          <td>${salu}</td>
+          <td>${visit}</td>
+          <td class="actions-cell">
+            <button class="icon-btn edit" title="Редактировать" onclick="event.stopPropagation();editGuest(${g.id})">✏️</button>
+            <button class="icon-btn del" title="Удалить" onclick="event.stopPropagation();deleteGuest(${g.id})">🗑</button>
+          </td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="7" class="text-muted" style="padding:24px;text-align:center">Гостей нет</td></tr>';
+    }
+
+    // ── CRUD ──────────────────────────────────────
     function openModal(guest = null) {
       document.getElementById('modal-title').textContent = guest ? 'Редактировать гостя' : 'Добавить гостя';
       document.getElementById('guest-id').value = guest ? guest.id : '';
@@ -248,8 +386,12 @@
       document.getElementById('gender').value = guest ? (guest.gender || 'male') : 'male';
       document.getElementById('custom-salutation').value = guest ? (guest.custom_salutation || '') : '';
       document.getElementById('group-id').value = guest && guest.group_id ? guest.group_id : '';
-      updateGroupAvailability(); // sets disabled state and calls updateSalutationVisibility
       document.getElementById('am-i-gosha').checked = guest ? guest.am_i_gosha : false;
+
+      // Login info line
+      document.getElementById('mg-login').textContent = guest && guest.login ? '@' + guest.login : '';
+
+      updateGroupAvailability();     // disabled state + avatar color + salutation visibility + preview
       document.getElementById('modal').classList.add('active');
     }
 
@@ -266,7 +408,9 @@
       }
     }
 
-    async function deleteGuest(id, name) {
+    async function deleteGuest(id) {
+      const g = allGuests.find(x => x.id === id);
+      const name = g ? `${g.last_name} ${g.first_name}` : 'гостя';
       if (!confirmDialog(`Удалить гостя «${name}»?`)) return;
       try {
         await api.guests.delete(id);
@@ -277,25 +421,26 @@
       }
     }
 
+    // Live head/preview updates while typing names
+    ['first-name', 'last-name', 'middle-name'].forEach(id =>
+      document.getElementById(id).addEventListener('input', updateSalutationPreview));
+
     document.getElementById('guest-form').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const id = document.getElementById('guest-id').value;
+      const id = val('guest-id');
       const data = {
-        last_name:         document.getElementById('last-name').value.trim(),
-        first_name:        document.getElementById('first-name').value.trim(),
-        middle_name:       document.getElementById('middle-name').value.trim(),
-        role:              document.getElementById('role').value,
-        gender:            document.getElementById('gender').value,
-        custom_salutation: document.getElementById('custom-salutation').value.trim(),
+        last_name:         val('last-name').trim(),
+        first_name:        val('first-name').trim(),
+        middle_name:       val('middle-name').trim(),
+        role:              val('role'),
+        gender:            val('gender'),
+        custom_salutation: val('custom-salutation').trim(),
         am_i_gosha:        document.getElementById('am-i-gosha').checked,
-        group_id:          document.getElementById('group-id').value ? parseInt(document.getElementById('group-id').value) : null,
+        group_id:          val('group-id') ? parseInt(val('group-id')) : null,
       };
       try {
-        if (id) {
-          await api.guests.update(id, data);
-        } else {
-          await api.guests.create(data);
-        }
+        if (id) await api.guests.update(id, data);
+        else    await api.guests.create(data);
         closeModal();
         await load();
         showAlert(document.getElementById('alert-container'), id ? 'Гость обновлён' : 'Гость добавлен');

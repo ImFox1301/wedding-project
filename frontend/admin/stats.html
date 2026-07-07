@@ -24,6 +24,7 @@
       <a href="/admin/music.html">Музыка</a>
       <div class="sidebar-section">Аналитика</div>
       <a href="/admin/stats.html" class="active">Статистика</a>
+      <a href="/admin/comments.html">Комментарии</a>
       <div class="sidebar-section">Прочее</div>
       <a href="/admin/settings.html">Настройки</a>
     </nav>
@@ -32,18 +33,23 @@
       <h1>Статистика</h1>
       <div id="alert-container"></div>
 
-      <!-- 1. Visits -->
+      <!-- Overview numbers -->
+      <div class="stats-grid mb-16" id="overview-summary"></div>
+
+      <!-- Donut charts row -->
+      <div class="charts-grid" id="donut-row"></div>
+
+      <!-- Visits by role (bar) -->
       <div class="card mb-16">
-        <div class="card-header"><h2>📊 Посещаемость приглашений</h2></div>
-        <div class="stats-grid" id="visit-summary"></div>
+        <div class="card-header"><h2>📊 Открытия приглашений по ролям</h2></div>
         <div class="chart-bar-wrap" id="visit-chart"></div>
       </div>
 
-      <!-- 2. Cottage dates (2.5.1, 2.5.2) -->
+      <!-- Cottage -->
       <div class="card mb-16">
         <div class="card-header"><h2>🏡 Коттедж — даты заезда</h2></div>
         <div class="stats-grid" id="cottage-summary"></div>
-        <div class="chart-bar-wrap" id="cottage-chart"></div>
+        <div class="chart-bar-wrap mt-16" id="cottage-chart"></div>
         <div class="table-wrap mt-16">
           <table id="cottage-table">
             <thead><tr><th>Гость</th><th>Дата заезда</th><th>Дата выезда</th></tr></thead>
@@ -52,10 +58,9 @@
         </div>
       </div>
 
-      <!-- 3. Tournament (2.5.3) -->
+      <!-- Tournament -->
       <div class="card mb-16">
         <div class="card-header"><h2>🏆 Турнир</h2></div>
-        <div class="stats-grid" id="tourn-summary"></div>
         <div class="table-wrap mt-16">
           <table id="tourn-table">
             <thead><tr><th>Участник</th><th>Желаемый соперник</th></tr></thead>
@@ -64,10 +69,9 @@
         </div>
       </div>
 
-      <!-- 4. Loft (2.6.1, 2.6.2) -->
+      <!-- Loft -->
       <div class="card">
         <div class="card-header"><h2>🏙 Лофт</h2></div>
-        <div class="stats-grid" id="loft-summary"></div>
         <div class="table-wrap mt-16">
           <table id="loft-table">
             <thead><tr><th>Гость</th><th>Едет в лофт</th><th>Нужен транспорт</th></tr></thead>
@@ -85,18 +89,79 @@
     requireAdmin();
     function logout() { clearAuth(); window.location.href = '/login.html'; }
 
+    // ── Chart helpers ──────────────────────────────
     function barChart(data, maxVal) {
       return data.map(item => `
         <div class="chart-bar-row">
           <span class="chart-bar-label">${item.label}</span>
           <div class="chart-bar-track">
-            <div class="chart-bar-fill" style="width:${maxVal ? Math.round(item.value / maxVal * 100) : 0}%"></div>
+            <div class="chart-bar-fill" style="width:${maxVal ? Math.round(item.value / maxVal * 100) : 0}%;${item.color ? 'background:' + item.color : ''}"></div>
           </div>
           <span class="chart-bar-value">${item.value}</span>
         </div>
       `).join('');
     }
 
+    // SVG donut. segments: [{label, value, color}]
+    function donut(segments, centerNum, centerSub) {
+      const size = 150, sw = 24, r = (size - sw) / 2, cx = size / 2, cy = size / 2;
+      const C = 2 * Math.PI * r;
+      const total = segments.reduce((a, s) => a + s.value, 0);
+      let offset = 0;
+      const arcs = total === 0 ? '' : segments.filter(s => s.value > 0).map(s => {
+        const len = (s.value / total) * C;
+        const el = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none"
+          stroke="${s.color}" stroke-width="${sw}"
+          stroke-dasharray="${len.toFixed(2)} ${(C - len).toFixed(2)}"
+          stroke-dashoffset="${(-offset).toFixed(2)}"
+          transform="rotate(-90 ${cx} ${cy})"><title>${s.label}: ${s.value}</title></circle>`;
+        offset += len;
+        return el;
+      }).join('');
+      const center = (centerNum !== undefined)
+        ? `<text x="${cx}" y="${cy - 2}" text-anchor="middle" class="donut-num">${centerNum}</text>
+           <text x="${cx}" y="${cy + 15}" text-anchor="middle" class="donut-sub">${centerSub || ''}</text>`
+        : '';
+      return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" class="donut">
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#eee" stroke-width="${sw}"/>
+        ${arcs}${center}</svg>`;
+    }
+
+    function legend(segments) {
+      const total = segments.reduce((a, s) => a + s.value, 0);
+      return `<div class="chart-legend">` + segments.map(s => {
+        const pct = total ? Math.round(s.value / total * 100) : 0;
+        return `<div class="legend-item">
+          <span class="legend-swatch" style="background:${s.color}"></span>
+          <span class="legend-label">${s.label}</span>
+          <span class="legend-value">${s.value}</span>
+          <span class="legend-pct">${pct}%</span>
+        </div>`;
+      }).join('') + `</div>`;
+    }
+
+    function donutCard(title, segments, centerNum, centerSub) {
+      return `<div class="chart-card">
+        <h3>${title}</h3>
+        <div class="donut-wrap">
+          ${donut(segments, centerNum, centerSub)}
+          ${legend(segments)}
+        </div>
+      </div>`;
+    }
+
+    function progressCard(title, label, value, total, color) {
+      const pct = total ? Math.round(value / total * 100) : 0;
+      return `<div class="chart-card">
+        <h3>${title}</h3>
+        <div class="metric-progress">
+          <div class="mp-row"><span>${label}</span><span>${value} из ${total} · ${pct}%</span></div>
+          <div class="mp-track"><div class="mp-fill" style="width:${pct}%;background:${color}"></div></div>
+        </div>
+      </div>`;
+    }
+
+    // ── Load & render ──────────────────────────────
     async function load() {
       try {
         const [visits, cottage, tourn, loft] = await Promise.all([
@@ -106,35 +171,74 @@
           api.stats.loft(),
         ]);
 
-        // Visits
-        const visitedCount = visits.filter(v => v.visited).length;
-        const notVisited = visits.length - visitedCount;
-        document.getElementById('visit-summary').innerHTML = `
-          <div class="stat-card"><div class="stat-number">${visits.length}</div><div class="stat-label">Всего гостей</div></div>
-          <div class="stat-card"><div class="stat-number">${visitedCount}</div><div class="stat-label">Открыли приглашение</div></div>
-          <div class="stat-card"><div class="stat-number">${notVisited}</div><div class="stat-label">Не открывали</div></div>
+        const C = { opened: '#5a9e5a', notOpened: '#dcdcdc', friends: '#6b6b6b',
+                    family: '#8fa8bd', yes: '#5a9e5a', no: '#dcdcdc',
+                    tourn: '#c98b3c', transport: '#4a7cae' };
+
+        const totalGuests  = visits.length;
+        const openedCount  = visits.filter(v => v.visited).length;
+        const notOpened    = totalGuests - openedCount;
+        const friendsAll   = visits.filter(v => v.role === 'friends');
+        const familyAll     = visits.filter(v => v.role === 'family');
+        const openPct      = totalGuests ? Math.round(openedCount / totalGuests * 100) : 0;
+
+        // Overview cards
+        document.getElementById('overview-summary').innerHTML = `
+          <div class="stat-card"><div class="stat-number">${totalGuests}</div><div class="stat-label">Всего гостей</div></div>
+          <div class="stat-card"><div class="stat-number">${openedCount}</div><div class="stat-label">Открыли приглашение</div></div>
+          <div class="stat-card"><div class="stat-number">${friendsAll.length}</div><div class="stat-label">Друзья</div></div>
+          <div class="stat-card"><div class="stat-number">${familyAll.length}</div><div class="stat-label">Семья</div></div>
         `;
+
+        // Donut row
+        const visitSegs = [
+          { label: 'Открыли', value: openedCount, color: C.opened },
+          { label: 'Не открывали', value: notOpened, color: C.notOpened },
+        ];
+        const roleSegs = [
+          { label: 'Друзья', value: friendsAll.length, color: C.friends },
+          { label: 'Семья', value: familyAll.length, color: C.family },
+        ];
+        const cottageGoing = cottage.guest_dates.length;
+        const tournTotal   = tourn.total || 0;
+        const tournSegs = [
+          { label: 'Участвуют', value: tournTotal, color: C.tourn },
+          { label: 'Не участвуют', value: Math.max(0, friendsAll.length - tournTotal), color: C.no },
+        ];
+        const loftGoing = loft.going_count || 0;
+        const loftTotal = loft.guests.length;
+        const loftSegs = [
+          { label: 'Едут в лофт', value: loftGoing, color: C.yes },
+          { label: 'Не едут', value: Math.max(0, loftTotal - loftGoing), color: C.no },
+        ];
+
+        document.getElementById('donut-row').innerHTML =
+          donutCard('Открытия приглашений', visitSegs, openPct + '%', 'открыли') +
+          donutCard('Гости по ролям', roleSegs, totalGuests, 'гостей') +
+          donutCard('Участие в турнире', tournSegs, tournTotal, 'из ' + friendsAll.length) +
+          donutCard('Поездка в лофт', loftSegs, loftGoing, 'из ' + loftTotal) +
+          progressCard('Транспорт до лофта', 'Нужен транспорт', loft.transport_count || 0, loftTotal, C.transport) +
+          progressCard('Едут в коттедж', 'Гостей едет', cottageGoing, friendsAll.length, C.opened);
+
+        // Visits by role (bar)
         const visitChartData = [
-          { label: 'Друзья (открыли)', value: visits.filter(v => v.role === 'friends' && v.visited).length },
-          { label: 'Друзья (нет)', value: visits.filter(v => v.role === 'friends' && !v.visited).length },
-          { label: 'Семья (открыли)', value: visits.filter(v => v.role === 'family' && v.visited).length },
-          { label: 'Семья (нет)', value: visits.filter(v => v.role === 'family' && !v.visited).length },
+          { label: 'Друзья · открыли', value: friendsAll.filter(v => v.visited).length, color: C.opened },
+          { label: 'Друзья · нет', value: friendsAll.filter(v => !v.visited).length, color: C.notOpened },
+          { label: 'Семья · открыли', value: familyAll.filter(v => v.visited).length, color: C.opened },
+          { label: 'Семья · нет', value: familyAll.filter(v => !v.visited).length, color: C.notOpened },
         ];
         const maxVisit = Math.max(...visitChartData.map(d => d.value), 1);
         document.getElementById('visit-chart').innerHTML = barChart(visitChartData, maxVisit);
 
         // Cottage
-        const cottageCount = cottage.guest_dates.length;
         document.getElementById('cottage-summary').innerHTML = `
-          <div class="stat-card"><div class="stat-number">${cottageCount}</div><div class="stat-label">Едут в коттедж</div></div>
+          <div class="stat-card"><div class="stat-number">${cottageGoing}</div><div class="stat-label">Едут в коттедж</div></div>
         `;
-        // Count by date
         const dateCounts = {};
-        cottage.guest_dates.forEach(gd => {
-          const key = gd.date_from;
-          dateCounts[key] = (dateCounts[key] || 0) + 1;
-        });
-        const dateChartData = Object.entries(dateCounts).map(([date, count]) => ({ label: date, value: count }));
+        cottage.guest_dates.forEach(gd => { dateCounts[gd.date_from] = (dateCounts[gd.date_from] || 0) + 1; });
+        const dateChartData = Object.entries(dateCounts)
+          .sort((a, b) => a[0].localeCompare(b[0]))
+          .map(([date, count]) => ({ label: date, value: count, color: '#6b8ea0' }));
         const maxDate = Math.max(...dateChartData.map(d => d.value), 1);
         document.getElementById('cottage-chart').innerHTML = dateChartData.length
           ? barChart(dateChartData, maxDate)
@@ -143,24 +247,12 @@
           <tr><td>${gd.last_name} ${gd.first_name}</td><td>${gd.date_from}</td><td>${gd.date_to}</td></tr>
         `).join('') || '<tr><td colspan="3" class="text-muted">Нет данных</td></tr>';
 
-        // Tournament
-        document.getElementById('tourn-summary').innerHTML = `
-          <div class="stat-card"><div class="stat-number">${tourn.total}</div><div class="stat-label">Участвуют в турнире</div></div>
-        `;
+        // Tournament table
         document.getElementById('tourn-tbody').innerHTML = tourn.participants.map(p => `
           <tr><td>${p.last_name} ${p.first_name}</td><td>${p.opponent_name || '—'}</td></tr>
         `).join('') || '<tr><td colspan="2" class="text-muted">Нет данных</td></tr>';
 
-        // Loft
-        document.getElementById('loft-summary').innerHTML = `
-          <div class="stat-card"><div class="stat-number">${loft.going_count}</div><div class="stat-label">Едут в лофт</div></div>
-          <div class="stat-card"><div class="stat-number">${loft.transport_count}</div><div class="stat-label">Нужен транспорт</div></div>
-        `;
-        const loftChartData = [
-          { label: 'Едут в лофт', value: loft.going_count },
-          { label: 'Нужен транспорт', value: loft.transport_count },
-          { label: 'Не едут', value: loft.guests.length - loft.going_count },
-        ];
+        // Loft table
         document.getElementById('loft-tbody').innerHTML = loft.guests.map(g => `
           <tr>
             <td>${g.last_name} ${g.first_name}</td>

@@ -146,10 +146,11 @@ func GetInvitePage(c *gin.Context) {
 			var tourn bool
 			var oppID *int
 			var comment string
+			var adminReply string
 			err := db.DB.QueryRow(
-				`SELECT going_cottage, cottage_date_from::text, cottage_date_to::text, tournament, preferred_opponent_id, comment
+				`SELECT going_cottage, cottage_date_from::text, cottage_date_to::text, tournament, preferred_opponent_id, comment, admin_reply
 				 FROM friend_responses WHERE guest_id=$1`, primaryID,
-			).Scan(&going, &df, &dt, &tourn, &oppID, &comment)
+			).Scan(&going, &df, &dt, &tourn, &oppID, &comment, &adminReply)
 			if err == nil {
 				m := map[string]interface{}{
 					"going_cottage":         going,
@@ -158,6 +159,7 @@ func GetInvitePage(c *gin.Context) {
 					"tournament":            tourn,
 					"preferred_opponent_id": oppID,
 					"comment":               comment,
+					"admin_reply":           adminReply,
 				}
 				friendResp = &m
 			}

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Комментарии — Админ</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <a class="logo" href="/admin/">💍 Свадьба — Админ</a>
+    <div class="user-info"><button class="btn-logout" onclick="logout()">Выйти</button></div>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar">
+      <div class="sidebar-section">Гости</div>
+      <a href="/admin/guests.html">Гости</a>
+      <a href="/admin/groups.html">Группы</a>
+      <a href="/admin/links.html">Ссылки-приглашения</a>
+      <div class="sidebar-section">Контент</div>
+      <a href="/admin/editor.html">Редактор страниц</a>
+      <a href="/admin/gifts.html">Подарки</a>
+      <a href="/admin/music.html">Музыка</a>
+      <div class="sidebar-section">Аналитика</div>
+      <a href="/admin/stats.html">Статистика</a>
+      <a href="/admin/comments.html" class="active">Комментарии</a>
+      <div class="sidebar-section">Прочее</div>
+      <a href="/admin/settings.html">Настройки</a>
+    </nav>
+
+    <main class="content">
+      <h1>Комментарии гостей</h1>
+      <p class="text-muted mb-16">Здесь собраны комментарии, оставленные гостями в форме. Вы можете ответить — ответ увидит гость на своей странице-приглашении.</p>
+      <div id="alert-container"></div>
+
+      <div class="stats-grid mb-16" id="comments-summary"></div>
+      <div id="comments-list"></div>
+    </main>
+  </div>
+
+  <footer><p>Панель администратора</p></footer>
+
+  <script src="/js/api.js"></script>
+  <script>
+    requireAdmin();
+    function logout() { clearAuth(); window.location.href = '/login.html'; }
+
+    function esc(s) {
+      return (s || '').replace(/[&<>"']/g, m => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]
+      ));
+    }
+
+    function fmtDateTime(str) {
+      if (!str) return '';
+      const d = new Date(str);
+      if (isNaN(d)) return '';
+      return d.toLocaleString('ru-RU', {
+        day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+      });
+    }
+
+    function fullName(c) {
+      return [c.last_name, c.first_name, c.middle_name].filter(Boolean).join(' ');
+    }
+
+    function roleBadge(role) {
+      const cls = role === 'family' ? 'badge-family' : 'badge-friends';
+      const label = role === 'family' ? 'Семья' : 'Друзья';
+      return `<span class="badge ${cls}">${label}</span>`;
+    }
+
+    function commentCard(c) {
+      const replied = c.admin_reply && c.admin_reply.trim();
+      const statusHtml = replied
+        ? `<span class="reply-status replied">✓ Ответ отправлен${c.admin_reply_at ? ' · ' + fmtDateTime(c.admin_reply_at) : ''}</span>`
+        : `<span class="reply-status pending">Без ответа</span>`;
+
+      return `
+        <div class="comment-card" id="comment-${c.guest_id}">
+          <div class="comment-card-head">
+            <div class="comment-author">
+              <div class="comment-avatar">${esc((c.first_name || '?').slice(0, 1))}</div>
+              <div>
+                <div class="comment-name">${esc(fullName(c))} ${roleBadge(c.role)}</div>
+                <div class="comment-date">${fmtDateTime(c.updated_at)}</div>
+              </div>
+            </div>
+            ${statusHtml}
+          </div>
+
+          ${c.comment && c.comment.trim()
+            ? `<div class="comment-bubble">${esc(c.comment)}</div>`
+            : `<div class="comment-bubble empty">— комментарий пуст —</div>`}
+
+          <div class="comment-reply">
+            <label>Ваш ответ</label>
+            <textarea class="form-control reply-input" id="reply-${c.guest_id}"
+              rows="3" placeholder="Напишите ответ гостю...">${esc(c.admin_reply)}</textarea>
+            <div class="comment-reply-actions">
+              <button class="btn btn-primary btn-sm" onclick="saveReply(${c.guest_id})">Сохранить ответ</button>
+              ${replied ? `<button class="btn btn-secondary btn-sm" onclick="clearReply(${c.guest_id})">Удалить ответ</button>` : ''}
+            </div>
+          </div>
+        </div>`;
+    }
+
+    async function saveReply(guestId) {
+      const val = (document.getElementById('reply-' + guestId).value || '').trim();
+      try {
+        await api.comments.reply(guestId, val);
+        showAlert(document.getElementById('alert-container'), 'Ответ сохранён', 'success');
+        await load();
+      } catch (e) {
+        showAlert(document.getElementById('alert-container'), e.message, 'danger');
+      }
+    }
+
+    async function clearReply(guestId) {
+      if (!confirmDialog('Удалить ответ?')) return;
+      try {
+        await api.comments.reply(guestId, '');
+        showAlert(document.getElementById('alert-container'), 'Ответ удалён', 'success');
+        await load();
+      } catch (e) {
+        showAlert(document.getElementById('alert-container'), e.message, 'danger');
+      }
+    }
+
+    async function load() {
+      try {
+        const comments = await api.comments.list();
+        const total = comments.length;
+        const answered = comments.filter(c => c.admin_reply && c.admin_reply.trim()).length;
+        const withText = comments.filter(c => c.comment && c.comment.trim()).length;
+
+        document.getElementById('comments-summary').innerHTML = `
+          <div class="stat-card"><div class="stat-number">${withText}</div><div class="stat-label">Комментариев</div></div>
+          <div class="stat-card"><div class="stat-number">${answered}</div><div class="stat-label">С ответом</div></div>
+          <div class="stat-card"><div class="stat-number">${Math.max(0, withText - answered)}</div><div class="stat-label">Ждут ответа</div></div>
+        `;
+
+        document.getElementById('comments-list').innerHTML = total
+          ? comments.map(commentCard).join('')
+          : '<div class="card"><p class="text-muted">Пока нет ни одного комментария.</p></div>';
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>
