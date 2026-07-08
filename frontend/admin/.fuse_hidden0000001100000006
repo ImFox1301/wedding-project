@@ -78,13 +78,11 @@
       <a href="/admin/links.html">Ссылки-приглашения</a>
       <div class="sidebar-section">Контент</div>
       <a href="/admin/editor.html">Редактор страниц</a>
-      <a href="/admin/personal-sections.html">Персональные разделы</a>
       <a href="/admin/gifts.html" class="active">Подарки</a>
       <a href="/admin/music.html">Музыка</a>
       <div class="sidebar-section">Аналитика</div>
       <a href="/admin/stats.html">Статистика</a>
       <a href="/admin/comments.html">Комментарии</a>
-      <a href="/admin/chat.html">Чат</a>
       <div class="sidebar-section">Прочее</div>
       <a href="/admin/settings.html">Настройки</a>
     </nav>

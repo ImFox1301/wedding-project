@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Чат — Админ</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .chat-room-tabs { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+    .chat-wrap {
+      border: 1px solid #e4e4e4; border-radius: 12px; background: #fff;
+      display: flex; flex-direction: column; height: 62vh; min-height: 380px; overflow: hidden;
+    }
+    .admin-chat-messages { flex: 1; overflow-y: auto; padding: 16px; background: #fafafa; }
+    .admin-chat-form { display: flex; gap: 8px; padding: 12px; border-top: 1px solid #eee; }
+    .admin-chat-form input { flex: 1; }
+    .admin-chat-messages .chat-msg { position: relative; width: fit-content; }
+    .admin-chat-messages .chat-msg.mine { margin-left: auto; }
+    .admin-chat-messages .chat-msg .msg-del {
+      position: absolute; top: -6px; right: -6px; width: 20px; height: 20px;
+      border: none; border-radius: 50%; background: #c0392b; color: #fff;
+      font-size: 13px; line-height: 1; cursor: pointer; opacity: 0;
+      display: flex; align-items: center; justify-content: center; transition: opacity .15s;
+    }
+    .admin-chat-messages .chat-msg:hover .msg-del { opacity: 1; }
+  </style>
+</head>
+<body>
+  <header>
+    <a class="logo" href="/admin/">💍 Свадьба — Админ</a>
+    <div class="user-info"><button class="btn-logout" onclick="logout()">Выйти</button></div>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar">
+      <div class="sidebar-section">Гости</div>
+      <a href="/admin/guests.html">Гости</a>
+      <a href="/admin/groups.html">Группы</a>
+      <a href="/admin/links.html">Ссылки-приглашения</a>
+      <div class="sidebar-section">Контент</div>
+      <a href="/admin/editor.html">Редактор страниц</a>
+      <a href="/admin/personal-sections.html">Персональные разделы</a>
+      <a href="/admin/gifts.html">Подарки</a>
+      <a href="/admin/music.html">Музыка</a>
+      <div class="sidebar-section">Аналитика</div>
+      <a href="/admin/stats.html">Статистика</a>
+      <a href="/admin/comments.html">Комментарии</a>
+      <a href="/admin/chat.html" class="active">Чат</a>
+      <div class="sidebar-section">Прочее</div>
+      <a href="/admin/settings.html">Настройки</a>
+    </nav>
+
+    <main class="content">
+      <h1>Чат</h1>
+      <p class="text-muted mb-16">Чаты для друзей и родственников — раздельные. Выберите комнату. Сообщения приходят в реальном времени.</p>
+      <div id="alert-container"></div>
+
+      <div class="chat-room-tabs">
+        <button class="btn btn-primary"   id="tab-friends" onclick="switchRoom('friends')">👥 Друзья</button>
+        <button class="btn btn-secondary" id="tab-family"  onclick="switchRoom('family')">👨‍👩‍👧 Родственники</button>
+        <div style="flex:1"></div>
+        <button class="btn btn-danger" onclick="clearChat()">🗑 Очистить историю</button>
+      </div>
+
+      <div class="chat-wrap">
+        <div class="admin-chat-messages" id="admin-chat-messages"></div>
+        <form class="admin-chat-form" id="admin-chat-form" autocomplete="off">
+          <input class="form-control" id="admin-chat-input" placeholder="Сообщение от организаторов…" maxlength="2000" autocomplete="off">
+          <button type="submit" class="btn btn-primary">Отправить</button>
+        </form>
+      </div>
+    </main>
+  </div>
+
+  <footer><p>Панель администратора</p></footer>
+
+  <script src="/js/api.js"></script>
+  <script>
+    requireAdmin();
+    function logout() { clearAuth(); window.location.href = '/login.html'; }
+
+    function esc(s) {
+      return (s || '').replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+    }
+    function fmtChatTime(str) {
+      const d = new Date(str); if (isNaN(d)) return '';
+      return d.toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    }
+
+    let room = 'friends', ws = null;
+
+    function isMine(m) { return !!m.is_admin; }
+    function msgHtml(m) {
+      const mine = isMine(m);
+      const cls = 'chat-msg' + (mine ? ' mine' : '') + (m.is_admin ? ' admin' : '');
+      const name = `<div class="chat-msg-name">${esc(m.sender_name)}</div>`;
+      const del = `<button class="msg-del" onclick="deleteMsg(${m.id})" title="Удалить сообщение">×</button>`;
+      return `<div class="${cls}" data-id="${m.id}">${del}${name}<div class="chat-msg-bubble">${esc(m.body)}</div><div class="chat-msg-time">${fmtChatTime(m.created_at)}</div></div>`;
+    }
+    function appendMsg(m) {
+      const list = document.getElementById('admin-chat-messages');
+      list.insertAdjacentHTML('beforeend', msgHtml(m));
+      list.scrollTop = list.scrollHeight;
+    }
+
+    function updateTabs() {
+      document.getElementById('tab-friends').className = room === 'friends' ? 'btn btn-primary' : 'btn btn-secondary';
+      document.getElementById('tab-family').className  = room === 'family'  ? 'btn btn-primary' : 'btn btn-secondary';
+    }
+
+    async function loadHistory() {
+      try {
+        const data = await api.chat.adminMessages(room);
+        const list = document.getElementById('admin-chat-messages');
+        list.innerHTML = (data.messages || []).map(msgHtml).join('')
+          || '<div class="chat-empty">Сообщений пока нет.</div>';
+        list.scrollTop = list.scrollHeight;
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    }
+
+    function connectWs() {
+      const sock = new WebSocket(chatWsUrl(room));
+      ws = sock;
+      sock.onmessage = ev => {
+        let m; try { m = JSON.parse(ev.data); } catch { return; }
+        if (m.type === 'chat_reload') { loadHistory(); return; }
+        if (m.type === 'gift_update') return;
+        appendMsg(m);
+      };
+      sock.onclose = () => { if (ws === sock) { ws = null; setTimeout(() => { if (!ws) connectWs(); }, 3000); } };
+      sock.onerror = () => { try { sock.close(); } catch {} };
+    }
+
+    function switchRoom(r) {
+      if (r === room && ws) return;
+      room = r;
+      if (ws) { const old = ws; ws = null; try { old.close(); } catch {} }
+      updateTabs();
+      loadHistory();
+      connectWs();
+    }
+
+    async function clearChat() {
+      const label = room === 'family' ? 'Родственники' : 'Друзья';
+      if (!confirmDialog(`Очистить всю историю чата «${label}»? Действие необратимо.`)) return;
+      try {
+        await api.chat.clear(room);
+        await loadHistory();
+        showAlert(document.getElementById('alert-container'), 'История чата очищена', 'success');
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    }
+
+    async function deleteMsg(id) {
+      if (!confirmDialog('Удалить это сообщение?')) return;
+      try {
+        await api.chat.deleteMessage(id);
+        await loadHistory();
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    }
+
+    document.getElementById('admin-chat-form').addEventListener('submit', e => {
+      e.preventDefault();
+      const input = document.getElementById('admin-chat-input');
+      const body = input.value.trim();
+      if (!body) return;
+      if (!ws || ws.readyState !== 1) { connectWs(); return; }
+      ws.send(JSON.stringify({ body }));
+      input.value = '';
+    });
+
+    updateTabs();
+    loadHistory();
+    connectWs();
+  </script>
+</body>
+</html>

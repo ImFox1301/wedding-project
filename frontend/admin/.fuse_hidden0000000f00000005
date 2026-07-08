@@ -65,7 +65,6 @@
       gap: 6px;
       flex-wrap: wrap;
     }
-    .section-card-actions { display: flex; gap: 6px; flex-shrink: 0; }
 
     /* ── Accordion gallery ── */
     .gallery-accordion { margin-top: 10px; }
@@ -195,16 +194,6 @@
     #img-toolbar button.active { background: #6b6b6b; color: #fff; border-color: #555; }
     #img-toolbar .tb-sep { width: 1px; height: 20px; background: #ddd; margin: 0 2px; }
 
-    /* Photo thumbnail grid (unified with «Персональные разделы») */
-    .photo-thumbs-ps { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-    .photo-thumb-ps { position: relative; width: 70px; height: 70px; border-radius: 6px; overflow: hidden; border: 1px solid #ddd; }
-    .photo-thumb-ps img { width: 100%; height: 100%; object-fit: cover; display: block; }
-    .photo-thumb-ps button {
-      position: absolute; top: 2px; right: 2px; width: 18px; height: 18px;
-      border: none; border-radius: 50%; background: rgba(192,57,43,.85); color: #fff;
-      font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1;
-    }
-
   </style>
 </head>
 <body>
@@ -221,13 +210,11 @@
       <a href="/admin/links.html">Ссылки-приглашения</a>
       <div class="sidebar-section">Контент</div>
       <a href="/admin/editor.html" class="active">Редактор страниц</a>
-      <a href="/admin/personal-sections.html">Персональные разделы</a>
       <a href="/admin/gifts.html">Подарки</a>
       <a href="/admin/music.html">Музыка</a>
       <div class="sidebar-section">Аналитика</div>
       <a href="/admin/stats.html">Статистика</a>
       <a href="/admin/comments.html">Комментарии</a>
-      <a href="/admin/chat.html">Чат</a>
       <div class="sidebar-section">Прочее</div>
       <a href="/admin/settings.html">Настройки</a>
     </nav>
@@ -237,7 +224,9 @@
       <div id="alert-container"></div>
 
       <p class="text-muted mb-16">
-        Каждая страница состоит из разделов. Подзаголовок («Вы приглашены…») настраивается в
+        Каждая страница состоит из разделов. В тексте можно вставить поля гостей:
+        <code>{{last_name}}</code>, <code>{{first_name}}</code>, <code>{{middle_name}}</code>,
+        <code>{{full_name}}</code>. Подзаголовок («Вы приглашены…») настраивается в
         <a href="/admin/settings.html">Настройках</a>.
       </p>
 
@@ -273,14 +262,6 @@
         <div class="form-group">
           <label>Текст</label>
           <div id="section-content-editor"></div>
-        </div>
-        <div class="form-group" id="photos-block" style="display:none">
-          <label>Фотографии</label>
-          <div class="photo-thumbs-ps" id="photo-thumbs"></div>
-          <label class="btn btn-secondary btn-sm" style="cursor:pointer;margin-top:8px">
-            📷 Добавить фото
-            <input type="file" accept="image/*" multiple style="display:none" id="section-photo-input" onchange="uploadPhotos(this)">
-          </label>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeSectionModal()">Отмена</button>
@@ -359,7 +340,7 @@
 
     const quill = new Quill('#section-content-editor', {
       theme: 'snow',
-      placeholder: 'Введите текст раздела…',
+      placeholder: 'Введите текст раздела. Используйте {{first_name}}, {{last_name}}, {{full_name}}…',
       modules: {
         toolbar: {
           container: [
@@ -487,14 +468,83 @@
       }
     }
 
-    // Thumbnail grid inside the edit modal (same look as "Персональные разделы")
-    function renderModalPhotos(s) {
-      const wrap = document.getElementById('photo-thumbs');
-      wrap.innerHTML = (s.photos || []).map(p => `
-        <div class="photo-thumb-ps">
+    // gallery state: sectionId → active photo index
+    const galleryState = {};
+    // photo data store: sectionId → [{id, filename}]
+    const sectionPhotos = {};
+
+    function buildGallery(s) {
+      if (!s.photos || !s.photos.length) return '';
+      sectionPhotos[s.id] = s.photos;
+      if (!(s.id in galleryState)) galleryState[s.id] = 0;
+      const idx = galleryState[s.id];
+      const cur = s.photos[idx];
+      const hasMany = s.photos.length > 1;
+
+      const thumbs = s.photos.map((p, i) => `
+        <div class="gallery-thumb-item ${i === idx ? 'active' : ''}"
+             onclick="setGalleryPhoto(${s.id}, ${i})">
           <img src="/uploads/${p.filename}" alt="">
-          <button type="button" onclick="deletePhoto(${p.id})" title="Удалить">✕</button>
-        </div>`).join('') || '<span class="text-muted" style="font-size:.8rem">Нет фото</span>';
+          <button class="gallery-thumb-del"
+            onclick="event.stopPropagation();deletePhoto(${s.id}, ${p.id})"
+            title="Удалить">✕</button>
+        </div>`).join('');
+
+      return `
+        <div class="gallery-accordion">
+          <button class="gallery-toggle" id="gallery-toggle-${s.id}"
+                  onclick="toggleGallery(${s.id})">
+            <span>📷 ${s.photos.length} фото</span>
+            <span id="gallery-arrow-${s.id}">▾</span>
+          </button>
+          <div class="gallery-body" id="gallery-body-${s.id}" style="display:none">
+            <div class="gallery-main-wrap">
+              ${hasMany ? `<button class="gallery-nav prev" onclick="prevGallery(${s.id})">&#8249;</button>` : ''}
+              <img class="gallery-main-img" id="gallery-main-${s.id}"
+                   src="/uploads/${cur.filename}" alt="">
+              <button class="gallery-zoom-btn" id="gallery-zoom-${s.id}"
+                      onclick="openPhotoModal('/uploads/${cur.filename}')">🔍</button>
+              ${hasMany ? `<button class="gallery-nav next" onclick="nextGallery(${s.id})">&#8250;</button>` : ''}
+            </div>
+            ${hasMany ? `<div class="gallery-thumbs-strip">${thumbs}</div>` : ''}
+          </div>
+        </div>`;
+    }
+
+    function toggleGallery(id) {
+      const body  = document.getElementById(`gallery-body-${id}`);
+      const arrow = document.getElementById(`gallery-arrow-${id}`);
+      const open  = body.style.display === 'none';
+      body.style.display  = open ? '' : 'none';
+      arrow.textContent   = open ? '▴' : '▾';
+    }
+
+    function setGalleryPhoto(sectionId, idx) {
+      galleryState[sectionId] = idx;
+      const photos = sectionPhotos[sectionId];
+      if (!photos) return;
+      const cur = photos[idx];
+      // Main image
+      const mainImg = document.getElementById(`gallery-main-${sectionId}`);
+      if (mainImg) { mainImg.style.opacity = '.5'; mainImg.src = '/uploads/' + cur.filename; mainImg.onload = () => mainImg.style.opacity = '1'; }
+      // Zoom button
+      const zoomBtn = document.getElementById(`gallery-zoom-${sectionId}`);
+      if (zoomBtn) zoomBtn.onclick = () => openPhotoModal('/uploads/' + cur.filename);
+      // Thumbnails
+      document.querySelectorAll(`#gallery-body-${sectionId} .gallery-thumb-item`).forEach((t, i) =>
+        t.classList.toggle('active', i === idx));
+    }
+
+    function prevGallery(sectionId) {
+      const photos = sectionPhotos[sectionId] || [];
+      const cur = galleryState[sectionId] || 0;
+      setGalleryPhoto(sectionId, (cur - 1 + photos.length) % photos.length);
+    }
+
+    function nextGallery(sectionId) {
+      const photos = sectionPhotos[sectionId] || [];
+      const cur = galleryState[sectionId] || 0;
+      setGalleryPhoto(sectionId, (cur + 1) % photos.length);
     }
 
     function openPhotoModal(src) {
@@ -518,21 +568,23 @@
         el.innerHTML = '<p class="text-muted">Нет разделов. Добавьте первый раздел.</p>';
         return;
       }
-      el.innerHTML = sections.map(s => {
-        const photoNote = s.photos && s.photos.length ? ` · 📷 ${s.photos.length}` : '';
-        return `
+      el.innerHTML = sections.map(s => `
         <div class="section-card" data-id="${s.id}" draggable="true">
           <span class="section-drag-handle" title="Перетащить">⠿</span>
           <div class="section-card-body">
-            <div class="section-card-title">${s.title || '<em style="color:#94a3b8">Без заголовка</em>'}${photoNote}</div>
+            <div class="section-card-title">${s.title || '<em style="color:#94a3b8">Без заголовка</em>'}</div>
             <div class="section-card-preview">${stripHtml(s.content) || '(нет текста)'}</div>
+            ${buildGallery(s)}
+            <div class="section-card-footer" style="margin-top:10px">
+              <button class="btn btn-secondary btn-sm" onclick="editSection(${s.id})">✏️ Редактировать</button>
+              <label class="btn btn-secondary btn-sm" style="cursor:pointer">
+                📷 Добавить фото
+                <input type="file" accept="image/*" style="display:none" onchange="uploadPhoto(${s.id}, this)">
+              </label>
+              <button class="btn btn-danger btn-sm" onclick="deleteSection(${s.id})">🗑</button>
+            </div>
           </div>
-          <div class="section-card-actions">
-            <button class="btn btn-secondary btn-sm" onclick="editSection(${s.id})">✏️ Редактировать</button>
-            <button class="btn btn-danger btn-sm" onclick="deleteSection(${s.id})">🗑</button>
-          </div>
-        </div>`;
-      }).join('');
+        </div>`).join('');
 
       initDragDrop();
     }
@@ -587,8 +639,6 @@
       document.getElementById('section-id').value    = '';
       document.getElementById('section-title').value = '';
       quill.root.innerHTML = '';
-      // Photos need a saved section — hide until it exists
-      document.getElementById('photos-block').style.display = 'none';
       document.getElementById('section-modal').classList.add('active');
       setTimeout(() => quill.focus(), 120);
     }
@@ -601,8 +651,6 @@
       const content = s.content || '';
       if (content.trim().startsWith('<')) quill.root.innerHTML = content;
       else quill.root.innerHTML = content.split('\n').map(l => `<p>${l || '<br>'}</p>`).join('');
-      document.getElementById('photos-block').style.display = '';
-      renderModalPhotos(s);
       document.getElementById('section-modal').classList.add('active');
       setTimeout(() => quill.focus(), 120);
     }
@@ -623,35 +671,25 @@
       }
     }
 
-    async function uploadPhotos(input) {
-      const sectionId = parseInt(document.getElementById('section-id').value);
-      const files = [...input.files];
-      if (!sectionId || !files.length) return;
+    async function uploadPhoto(sectionId, input) {
+      if (!input.files[0]) return;
+      const form = new FormData();
+      form.append('photo', input.files[0]);
       try {
-        for (const f of files) {
-          const form = new FormData();
-          form.append('photo', f);
-          await api.sections.uploadPhoto(sectionId, form);
-        }
+        await api.sections.uploadPhoto(sectionId, form);
         await load();
-        const s = sections.find(x => x.id === sectionId);
-        if (s) renderModalPhotos(s);
-        showAlert(document.getElementById('alert-container'),
-          files.length > 1 ? `Добавлено фото: ${files.length}` : 'Фото добавлено');
+        showAlert(document.getElementById('alert-container'), 'Фото добавлено');
       } catch (err) {
         showAlert(document.getElementById('alert-container'), err.message, 'danger');
       }
       input.value = '';
     }
 
-    async function deletePhoto(photoId) {
-      const sectionId = parseInt(document.getElementById('section-id').value);
-      if (!sectionId || !confirmDialog('Удалить фото?')) return;
+    async function deletePhoto(sectionId, photoId) {
+      if (!confirmDialog('Удалить фото?')) return;
       try {
         await api.sections.deletePhoto(sectionId, photoId);
         await load();
-        const s = sections.find(x => x.id === sectionId);
-        if (s) renderModalPhotos(s);
       } catch (err) {
         showAlert(document.getElementById('alert-container'), err.message, 'danger');
       }

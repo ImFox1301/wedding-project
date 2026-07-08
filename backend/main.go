@@ -44,6 +44,9 @@ func main() {
 	// Public invite page (by token, no auth needed)
 	api.GET("/invite/:token", handlers.GetInvitePage)
 
+	// Chat WebSocket (token via query; handler validates and routes to a room)
+	api.GET("/ws/chat", handlers.ChatWS)
+
 	// Admin routes
 	admin := api.Group("/admin", middleware.Auth(), middleware.AdminOnly())
 	{
@@ -78,6 +81,8 @@ func main() {
 		// Page sections
 		admin.GET("/sections", handlers.ListSections)
 		admin.POST("/sections", handlers.CreateSection)
+		admin.GET("/personal-sections", handlers.ListPersonalSections)
+		admin.POST("/personal-sections", handlers.CreatePersonalSection)
 		admin.PUT("/sections/:id", handlers.UpdateSection)
 		admin.PUT("/sections/:id/order", handlers.UpdateSectionOrder)
 		admin.DELETE("/sections/:id", handlers.DeleteSection)
@@ -99,10 +104,16 @@ func main() {
 		admin.GET("/stats/cottage", handlers.StatsCottage)
 		admin.GET("/stats/tournament", handlers.StatsTournament)
 		admin.GET("/stats/loft", handlers.StatsLoft)
+		admin.GET("/stats/attendance", handlers.StatsAttendance)
 
 		// Comments
 		admin.GET("/comments", handlers.ListComments)
 		admin.PUT("/comments/:guestId/reply", handlers.ReplyComment)
+
+		// Chat (admin views a chosen room)
+		admin.GET("/chat/messages", handlers.GetAdminChatMessages)
+		admin.DELETE("/chat/messages", handlers.ClearChat)
+		admin.DELETE("/chat/messages/:id", handlers.DeleteChatMessage)
 	}
 
 	// Guest routes (authenticated guests)
@@ -115,8 +126,15 @@ func main() {
 		guest.GET("/gifts", handlers.GetGifts)
 		guest.POST("/gifts/:id/pick", handlers.PickGift)
 		guest.DELETE("/gifts/:id/pick", handlers.UnpickGift)
+		guest.PUT("/group-gift-pick", handlers.SaveGroupGiftPick)
+		guest.GET("/group-gift-picks", handlers.GetGroupGiftPicks)
 		guest.GET("/music", handlers.GetMusic)
 		guest.GET("/friends", handlers.GetFriends)
+
+		// Chat (guest's own room)
+		guest.GET("/chat/messages", handlers.GetChatMessages)
+		guest.GET("/chat/unread", handlers.GetChatUnread)
+		guest.POST("/chat/seen", handlers.MarkChatSeen)
 	}
 
 	port := os.Getenv("PORT")

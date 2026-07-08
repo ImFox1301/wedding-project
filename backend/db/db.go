@@ -130,6 +130,37 @@ func Migrate() {
 		// Attendance ("Приду / Не приду") — NULL = not decided yet
 		`ALTER TABLE friend_responses ADD COLUMN IF NOT EXISTS attending BOOLEAN`,
 		`ALTER TABLE family_responses ADD COLUMN IF NOT EXISTS attending BOOLEAN`,
+		// Personal / group subtitle for invitation pages
+		`ALTER TABLE guests ADD COLUMN IF NOT EXISTS subtitle TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE guest_groups ADD COLUMN IF NOT EXISTS subtitle TEXT NOT NULL DEFAULT ''`,
+		// Personal sections: a page_section may belong to a single guest or a group.
+		// Common sections keep both NULL. Deleting the guest/group removes its section.
+		`ALTER TABLE page_sections ADD COLUMN IF NOT EXISTS guest_id INTEGER REFERENCES guests(id) ON DELETE CASCADE`,
+		`ALTER TABLE page_sections ADD COLUMN IF NOT EXISTS group_id INTEGER REFERENCES guest_groups(id) ON DELETE CASCADE`,
+		// At most one personal section per guest and per group
+		`CREATE UNIQUE INDEX IF NOT EXISTS uniq_section_guest ON page_sections(guest_id) WHERE guest_id IS NOT NULL`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS uniq_section_group ON page_sections(group_id) WHERE group_id IS NOT NULL`,
+		// Chat: two shared rooms per role. When a guest last viewed the chat.
+		`ALTER TABLE guests ADD COLUMN IF NOT EXISTS chat_seen_at TIMESTAMP`,
+		`CREATE TABLE IF NOT EXISTS chat_messages (
+			id SERIAL PRIMARY KEY,
+			role VARCHAR(50) NOT NULL,
+			guest_id INTEGER REFERENCES guests(id) ON DELETE SET NULL,
+			group_id INTEGER REFERENCES guest_groups(id) ON DELETE SET NULL,
+			sender_name VARCHAR(255) NOT NULL DEFAULT '',
+			is_admin BOOLEAN DEFAULT FALSE,
+			body TEXT NOT NULL,
+			created_at TIMESTAMP DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_chat_role_id ON chat_messages(role, id)`,
+		// Custom group salutation (supports {{first_names}} / {{last_names}} / {{full_names}})
+		`ALTER TABLE guest_groups ADD COLUMN IF NOT EXISTS custom_salutation TEXT NOT NULL DEFAULT ''`,
+		// Per-guest gift pick inside a group (many guests may pick the same gift)
+		`CREATE TABLE IF NOT EXISTS group_gift_picks (
+			guest_id INTEGER PRIMARY KEY REFERENCES guests(id) ON DELETE CASCADE,
+			gift_id INTEGER REFERENCES gifts(id) ON DELETE SET NULL,
+			updated_at TIMESTAMP DEFAULT NOW()
+		)`,
 		// Default settings
 		`INSERT INTO admin_settings (key, value) VALUES
 			('cottage_date_from',      ''),

@@ -90,8 +90,10 @@ func CreateGroup(c *gin.Context) {
 func UpdateGroup(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 	var req struct {
-		Name    string `json:"name"`
-		Members []int  `json:"members"`
+		Name             string `json:"name"`
+		Subtitle         string `json:"subtitle"`
+		CustomSalutation string `json:"custom_salutation"`
+		Members          []int  `json:"members"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -120,12 +122,22 @@ func UpdateGroup(c *gin.Context) {
 	if req.Name != "" {
 		db.DB.Exec(`UPDATE guest_groups SET name=$1 WHERE id=$2`, req.Name, id)
 	}
+	db.DB.Exec(`UPDATE guest_groups SET subtitle=$1, custom_salutation=$2 WHERE id=$3`, req.Subtitle, req.CustomSalutation, id)
 	// Remove all current members
 	db.DB.Exec(`UPDATE guests SET group_id=NULL WHERE group_id=$1`, id)
-	// Assign new members
+	// Assign new members — but never steal a guest who is already in another
+	// group; they must be removed from it manually first.
 	for _, gid := range req.Members {
-		db.DB.Exec(`UPDATE guests SET group_id=$1 WHERE id=$2`, id, gid)
+		db.DB.Exec(`UPDATE guests SET group_id=$1 WHERE id=$2 AND (group_id IS NULL OR group_id=$1)`, id, gid)
 	}
+	// Guests removed from any group lose their group gift pick
+	db.DB.Exec(`DELETE FROM group_gift_picks WHERE guest_id IN (SELECT id FROM guests WHERE group_id IS NULL)`)
+
+	// Guests now in this group lose their personal invitation link and any single
+	// (exclusive) gift pick. The group link is never auto-deleted (removed only
+	// manually or on cascade), even if the group ends up with one/zero members.
+	db.DB.Exec(`DELETE FROM invitation_links WHERE guest_id IN (SELECT id FROM guests WHERE group_id=$1)`, id)
+	db.DB.Exec(`UPDATE gifts SET selected_by_guest_id=NULL WHERE selected_by_guest_id IN (SELECT id FROM guests WHERE group_id=$1)`, id)
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
@@ -156,14 +168,15 @@ func DeleteGroup(c *gin.Context) {
 		return
 	}
 	db.DB.Exec(`UPDATE guests SET group_id=NULL WHERE group_id=$1`, id)
+	db.DB.Exec(`DELETE FROM group_gift_picks WHERE guest_id IN (SELECT id FROM guests WHERE group_id IS NULL)`)
 	db.DB.Exec(`DELETE FROM guest_groups WHERE id=$1`, id)
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
 func GetGroup(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
-	var name, createdAt string
-	err := db.DB.QueryRow(`SELECT name, to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') FROM guest_groups WHERE id=$1`, id).Scan(&name, &createdAt)
+	var name, createdAt, subtitle, customSalutation string
+	err := db.DB.QueryRow(`SELECT name, subtitle, custom_salutation, to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') FROM guest_groups WHERE id=$1`, id).Scan(&name, &subtitle, &customSalutation, &createdAt)
 	if err == sql.ErrNoRows {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 		return
@@ -184,5 +197,5 @@ func GetGroup(c *gin.Context) {
 	if members == nil {
 		members = []Member{}
 	}
-	c.JSON(http.StatusOK, gin.H{"id": id, "name": name, "created_at": createdAt, "members": members})
+	c.JSON(http.StatusOK, gin.H{"id": id, "name": name, "subtitle": subtitle, "custom_salutation": customSalutation, "created_at": createdAt, "members": members})
 }

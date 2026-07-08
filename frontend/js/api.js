@@ -105,6 +105,12 @@ const api = {
     deletePhoto: (sId, pId) => api.delete('/admin/sections/' + sId + '/photos/' + pId),
   },
 
+  // Admin - personal sections (per guest / per group)
+  personalSections: {
+    list:   ()     => api.get('/admin/personal-sections'),
+    create: (data) => api.post('/admin/personal-sections', data),
+  },
+
   // Admin - settings
   settings: {
     get:    ()         => api.get('/admin/settings'),
@@ -134,12 +140,23 @@ const api = {
     cottage:    () => api.get('/admin/stats/cottage'),
     tournament: () => api.get('/admin/stats/tournament'),
     loft:       () => api.get('/admin/stats/loft'),
+    attendance: () => api.get('/admin/stats/attendance'),
   },
 
   // Admin - comments
   comments: {
     list:  ()                => api.get('/admin/comments'),
     reply: (guestId, reply)  => api.put('/admin/comments/' + guestId + '/reply', { reply }),
+  },
+
+  // Chat
+  chat: {
+    messages:      ()     => api.get('/guest/chat/messages'),
+    unread:        ()     => api.get('/guest/chat/unread'),
+    seen:          ()     => api.post('/guest/chat/seen'),
+    adminMessages: (room) => api.get('/admin/chat/messages?room=' + room),
+    clear:         (room) => api.delete('/admin/chat/messages?room=' + room),
+    deleteMessage: (id)   => api.delete('/admin/chat/messages/' + id),
   },
 
   // Guest
@@ -152,9 +169,19 @@ const api = {
   guestGifts:  ()           => api.get('/guest/gifts'),
   pickGift:    (id)         => api.post('/guest/gifts/' + id + '/pick'),
   unpickGift:  (id)         => apiRequest('DELETE', '/guest/gifts/' + id + '/pick'),
+  saveGroupGiftPick: (data) => api.put('/guest/group-gift-pick', data),
+  groupGiftPicks:    ()     => api.get('/guest/group-gift-picks'),
   guestMusic:  ()           => api.get('/guest/music'),
-  friendsList: ()           => api.get('/guest/friends'),
+  friendsList: (all)        => api.get('/guest/friends' + (all ? '?all=1' : '')),
 };
+
+// Build the chat WebSocket URL (token passed as query — browsers can't set headers on WS)
+function chatWsUrl(room) {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  let u = proto + '://' + location.host + '/api/ws/chat?token=' + encodeURIComponent(getToken() || '');
+  if (room) u += '&room=' + room;
+  return u;
+}
 
 // Require admin auth
 function requireAdmin() {

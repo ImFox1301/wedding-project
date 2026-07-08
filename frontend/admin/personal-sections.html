@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Персональные разделы — Админ</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.snow.min.css">
+  <style>
+    .ql-container { font-family: Arial, sans-serif; font-size: 14px; }
+    .ql-editor    { min-height: 180px; }
+    .ql-editor img { max-width: 100%; height: auto; }
+    .ps-card {
+      background: #fff; border: 1px solid #e4e4e4; border-radius: 10px;
+      padding: 16px 18px; margin-bottom: 12px;
+      display: flex; align-items: flex-start; gap: 14px;
+    }
+    .ps-card.locked { opacity: .7; }
+    .ps-ico { font-size: 1.6rem; flex-shrink: 0; }
+    .ps-body { flex: 1; min-width: 0; }
+    .ps-title { font-weight: 700; color: #333; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .ps-preview { font-size: .82rem; color: #777; margin-top: 4px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ps-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .badge-lock { background: #fdecc8; color: #8a5a00; }
+    .photo-thumbs-ps { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .photo-thumb-ps { position: relative; width: 70px; height: 70px; border-radius: 6px; overflow: hidden; border: 1px solid #ddd; }
+    .photo-thumb-ps img { width: 100%; height: 100%; object-fit: cover; }
+    .photo-thumb-ps button { position: absolute; top: 2px; right: 2px; width: 18px; height: 18px;
+      border: none; border-radius: 50%; background: rgba(192,57,43,.85); color: #fff; font-size: 10px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <header>
+    <a class="logo" href="/admin/">💍 Свадьба — Админ</a>
+    <div class="user-info"><button class="btn-logout" onclick="logout()">Выйти</button></div>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar">
+      <div class="sidebar-section">Гости</div>
+      <a href="/admin/guests.html">Гости</a>
+      <a href="/admin/groups.html">Группы</a>
+      <a href="/admin/links.html">Ссылки-приглашения</a>
+      <div class="sidebar-section">Контент</div>
+      <a href="/admin/editor.html">Редактор страниц</a>
+      <a href="/admin/personal-sections.html" class="active">Персональные разделы</a>
+      <a href="/admin/gifts.html">Подарки</a>
+      <a href="/admin/music.html">Музыка</a>
+      <div class="sidebar-section">Аналитика</div>
+      <a href="/admin/stats.html">Статистика</a>
+      <a href="/admin/comments.html">Комментарии</a>
+      <a href="/admin/chat.html">Чат</a>
+      <div class="sidebar-section">Прочее</div>
+      <a href="/admin/settings.html">Настройки</a>
+    </nav>
+
+    <main class="content">
+      <div class="flex align-center justify-between mb-16">
+        <h1>Персональные разделы</h1>
+        <button class="btn btn-primary" onclick="openCreate()">+ Добавить раздел</button>
+      </div>
+      <div id="alert-container"></div>
+      <p class="text-muted mb-16">
+        Персональный раздел показывается гостю <strong>над</strong> общими разделами. Можно создать один
+        раздел для гостя (вне группы) или один для группы. Если гость добавлен в группу, его персональный
+        раздел сохраняется, но становится недоступен для редактирования и не показывается — вернётся, когда
+        гостя уберут из группы.
+      </p>
+
+      <div id="ps-list"></div>
+    </main>
+  </div>
+
+  <footer><p>Панель администратора</p></footer>
+
+  <!-- Editor modal -->
+  <div class="modal-overlay" id="ps-modal">
+    <div class="modal" style="max-width:720px">
+      <div class="modal-header">
+        <h2 id="ps-modal-title">Персональный раздел</h2>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <form id="ps-form">
+        <div class="alert alert-info" id="lock-notice" style="display:none">
+          🔒 Раздел заблокирован: гость состоит в группе. Уберите гостя из группы, чтобы редактировать.
+        </div>
+
+        <!-- Target pickers (create mode only) -->
+        <div id="target-pickers">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Кому *</label>
+              <select class="form-control" id="target-type" onchange="fillTargets()">
+                <option value="guest">Гостю (вне группы)</option>
+                <option value="group">Группе</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Выберите *</label>
+              <select class="form-control" id="target-id"></select>
+            </div>
+          </div>
+        </div>
+        <div id="target-label" class="form-group" style="display:none">
+          <label>Раздел для</label>
+          <div><strong id="target-name-text"></strong></div>
+        </div>
+
+        <div class="form-group">
+          <label>Заголовок раздела</label>
+          <input type="text" class="form-control" id="ps-title">
+        </div>
+        <div class="form-group">
+          <label>Текст</label>
+          <div id="ps-content-editor"></div>
+        </div>
+
+        <!-- Photos (edit mode) -->
+        <div class="form-group" id="photos-block" style="display:none">
+          <label>Фотографии</label>
+          <div class="photo-thumbs-ps" id="photo-thumbs"></div>
+          <label class="btn btn-secondary btn-sm" style="cursor:pointer;margin-top:8px">
+            📷 Добавить фото
+            <input type="file" accept="image/*" multiple style="display:none" id="photo-input" onchange="uploadPhotos(this)">
+          </label>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-danger" id="delete-btn" style="display:none;margin-right:auto" onclick="deleteCurrent()">🗑 Удалить</button>
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Отмена</button>
+          <button type="submit" class="btn btn-primary" id="save-btn">Сохранить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.min.js"></script>
+  <script src="/js/api.js"></script>
+  <script>
+    requireAdmin();
+    function logout() { clearAuth(); window.location.href = '/login.html'; }
+
+    const quill = new Quill('#ps-content-editor', {
+      theme: 'snow',
+      placeholder: 'Текст раздела. Можно вставлять {{first_name}}, {{last_name}}, {{full_name}}…',
+      modules: { toolbar: [
+        [{ header: [2, 3, false] }],
+        ['bold', 'italic', 'underline'],
+        [{ list: 'ordered' }, { list: 'bullet' }],
+        [{ align: [] }],
+        ['link', 'image'],
+        ['clean'],
+      ]},
+    });
+
+    let allGuests = [], allGroups = [], personalList = [];
+    let editingId = null, createMode = true;
+
+    function stripHtml(html) { return (html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(); }
+    function esc(s) { return (s || '').replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+
+    async function load() {
+      try {
+        [personalList, allGuests, allGroups] = await Promise.all([
+          api.personalSections.list(), api.guests.list(), api.groups.list(),
+        ]);
+        renderList();
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    }
+
+    function hasSection(type, id) {
+      return personalList.some(s => type === 'guest' ? s.guest_id === id : s.group_id === id);
+    }
+
+    function renderList() {
+      const el = document.getElementById('ps-list');
+      if (!personalList.length) {
+        el.innerHTML = '<div class="card"><p class="text-muted">Персональных разделов пока нет.</p></div>';
+        return;
+      }
+      el.innerHTML = personalList.map(s => {
+        const typeBadge = s.target_type === 'group'
+          ? '<span class="badge badge-family">Группа</span>'
+          : '<span class="badge badge-friends">Гость</span>';
+        const lock = s.locked ? '<span class="badge badge-lock">🔒 заблокирован (в группе)</span>' : '';
+        return `
+          <div class="ps-card ${s.locked ? 'locked' : ''}">
+            <div class="ps-ico">${s.target_type === 'group' ? '👥' : '👤'}</div>
+            <div class="ps-body">
+              <div class="ps-title">${esc(s.target_name)} ${typeBadge} ${lock}</div>
+              <div class="ps-preview">${esc(s.title) ? '<b>' + esc(s.title) + '</b> — ' : ''}${esc(stripHtml(s.content)) || '(нет текста)'}</div>
+            </div>
+            <div class="ps-actions">
+              <button class="btn btn-secondary btn-sm" onclick="openEdit(${s.id})">${s.locked ? '👁 Открыть' : '✏️ Редактировать'}</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteById(${s.id})">🗑</button>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    function fillTargets() {
+      const type = document.getElementById('target-type').value;
+      const sel = document.getElementById('target-id');
+      let opts = '';
+      if (type === 'guest') {
+        const eligible = allGuests.filter(g => g.role !== 'admin' && !g.group_id && !hasSection('guest', g.id));
+        opts = eligible.length
+          ? eligible.map(g => `<option value="${g.id}">${esc([g.last_name, g.first_name, g.middle_name].filter(Boolean).join(' '))}</option>`).join('')
+          : '<option value="">— нет доступных гостей —</option>';
+      } else {
+        const eligible = allGroups.filter(gr => !hasSection('group', gr.id));
+        opts = eligible.length
+          ? eligible.map(gr => `<option value="${gr.id}">${esc(gr.name)}</option>`).join('')
+          : '<option value="">— нет доступных групп —</option>';
+      }
+      sel.innerHTML = opts;
+    }
+
+    function openCreate() {
+      createMode = true; editingId = null;
+      document.getElementById('ps-modal-title').textContent = 'Новый персональный раздел';
+      document.getElementById('target-pickers').style.display = '';
+      document.getElementById('target-label').style.display = 'none';
+      document.getElementById('lock-notice').style.display = 'none';
+      document.getElementById('photos-block').style.display = 'none';
+      document.getElementById('delete-btn').style.display = 'none';
+      document.getElementById('save-btn').style.display = '';
+      document.getElementById('ps-title').value = '';
+      quill.root.innerHTML = '';
+      setReadonly(false);
+      fillTargets();
+      document.getElementById('ps-modal').classList.add('active');
+    }
+
+    function openEdit(id) {
+      const s = personalList.find(x => x.id === id);
+      if (!s) return;
+      createMode = false; editingId = id;
+      document.getElementById('ps-modal-title').textContent = 'Персональный раздел';
+      document.getElementById('target-pickers').style.display = 'none';
+      document.getElementById('target-label').style.display = '';
+      document.getElementById('target-name-text').textContent =
+        s.target_name + (s.target_type === 'group' ? ' (группа)' : ' (гость)');
+      document.getElementById('lock-notice').style.display = s.locked ? '' : 'none';
+      document.getElementById('delete-btn').style.display = '';
+      document.getElementById('save-btn').style.display = s.locked ? 'none' : '';
+      document.getElementById('ps-title').value = s.title || '';
+      const content = s.content || '';
+      if (content.trim().startsWith('<')) quill.root.innerHTML = content;
+      else quill.root.innerHTML = content.split('\n').map(l => `<p>${l || '<br>'}</p>`).join('');
+      setReadonly(s.locked);
+      renderPhotos(s);
+      document.getElementById('photos-block').style.display = s.locked ? 'none' : '';
+      document.getElementById('ps-modal').classList.add('active');
+    }
+
+    function setReadonly(ro) {
+      quill.enable(!ro);
+      document.getElementById('ps-title').readOnly = ro;
+    }
+
+    function renderPhotos(s) {
+      const wrap = document.getElementById('photo-thumbs');
+      wrap.innerHTML = (s.photos || []).map(p => `
+        <div class="photo-thumb-ps">
+          <img src="/uploads/${p.filename}" alt="">
+          <button type="button" onclick="deletePhoto(${p.id})">✕</button>
+        </div>`).join('') || '<span class="text-muted" style="font-size:.8rem">Нет фото</span>';
+    }
+
+    function closeModal() { document.getElementById('ps-modal').classList.remove('active'); }
+
+    async function uploadPhotos(input) {
+      const files = [...input.files];
+      if (!files.length || !editingId) return;
+      try {
+        for (const f of files) {
+          const form = new FormData();
+          form.append('photo', f);
+          await api.sections.uploadPhoto(editingId, form);
+        }
+        await load();
+        openEdit(editingId);
+        showAlert(document.getElementById('alert-container'),
+          files.length > 1 ? `Добавлено фото: ${files.length}` : 'Фото добавлено');
+      } catch (err) { showAlert(document.getElementById('alert-container'), err.message, 'danger'); }
+      input.value = '';
+    }
+
+    async function deletePhoto(photoId) {
+      if (!confirmDialog('Удалить фото?')) return;
+      try { await api.sections.deletePhoto(editingId, photoId); await load(); openEdit(editingId); }
+      catch (err) { showAlert(document.getElementById('alert-container'), err.message, 'danger'); }
+    }
+
+    async function deleteById(id) {
+      if (!confirmDialog('Удалить персональный раздел?')) return;
+      try {
+        await api.sections.delete(id);
+        await load();
+        showAlert(document.getElementById('alert-container'), 'Раздел удалён');
+      } catch (err) { showAlert(document.getElementById('alert-container'), err.message, 'danger'); }
+    }
+    function deleteCurrent() { if (editingId) { closeModal(); deleteById(editingId); } }
+
+    document.getElementById('ps-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const title   = document.getElementById('ps-title').value.trim();
+      const content = quill.root.innerHTML === '<p><br></p>' ? '' : quill.root.innerHTML;
+      try {
+        if (createMode) {
+          const type = document.getElementById('target-type').value;
+          const tid  = parseInt(document.getElementById('target-id').value);
+          if (!tid) { showAlert(document.getElementById('alert-container'), 'Выберите гостя или группу', 'danger'); return; }
+          const body = { title, content };
+          if (type === 'guest') body.guest_id = tid; else body.group_id = tid;
+          await api.personalSections.create(body);
+        } else {
+          await api.sections.update(editingId, { title, content, order: 0 });
+        }
+        closeModal();
+        await load();
+        showAlert(document.getElementById('alert-container'), 'Раздел сохранён');
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    });
+
+    load();
+  </script>
+</body>
+</html>

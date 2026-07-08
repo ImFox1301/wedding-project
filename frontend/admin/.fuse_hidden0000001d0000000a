@@ -26,7 +26,6 @@
       <div class="sidebar-section">Аналитика</div>
       <a href="/admin/stats.html">Статистика</a>
       <a href="/admin/comments.html">Комментарии</a>
-      <a href="/admin/chat.html">Чат</a>
       <div class="sidebar-section">Прочее</div>
       <a href="/admin/settings.html" class="active">Настройки</a>
     </nav>

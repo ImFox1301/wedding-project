@@ -148,6 +148,30 @@ func StatsTournament(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"participants": result, "total": total})
 }
 
+// StatsAttendance returns "Приду / Не приду" counts per role.
+func StatsAttendance(c *gin.Context) {
+	roleStats := func(role, table string) gin.H {
+		var total, coming, declined int
+		db.DB.QueryRow(`SELECT COUNT(*) FROM guests WHERE role=$1`, role).Scan(&total)
+		db.DB.QueryRow(`
+			SELECT COUNT(*) FROM `+table+` r JOIN guests g ON g.id=r.guest_id
+			WHERE g.role=$1 AND r.attending=TRUE`, role).Scan(&coming)
+		db.DB.QueryRow(`
+			SELECT COUNT(*) FROM `+table+` r JOIN guests g ON g.id=r.guest_id
+			WHERE g.role=$1 AND r.attending=FALSE`, role).Scan(&declined)
+		undecided := total - coming - declined
+		if undecided < 0 {
+			undecided = 0
+		}
+		return gin.H{"total": total, "coming": coming, "declined": declined, "undecided": undecided}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"friends": roleStats("friends", "friend_responses"),
+		"family":  roleStats("family", "family_responses"),
+	})
+}
+
 func StatsLoft(c *gin.Context) {
 	rows, err := db.DB.Query(`
 		SELECT g.last_name, g.first_name, fr.going_loft, fr.needs_transport

@@ -18,7 +18,17 @@ func ListGifts(c *gin.Context) {
 	query := `
 		SELECT g.id, g.name, g.description, g.role, g.is_pickable, g.selected_by_guest_id,
 		       COALESCE(gu.last_name || ' ' || gu.first_name, '') as selected_by_name,
-		       g.photo_filename, g.link_url
+		       g.photo_filename, g.link_url,
+		       COALESCE((
+		           SELECT string_agg(nm, ', ' ORDER BY nm) FROM (
+		               SELECT gu2.last_name || ' ' || gu2.first_name AS nm
+		               FROM group_gift_picks gp JOIN guests gu2 ON gu2.id = gp.guest_id
+		               WHERE gp.gift_id = g.id
+		               UNION
+		               SELECT gsel.last_name || ' ' || gsel.first_name
+		               FROM guests gsel WHERE gsel.id = g.selected_by_guest_id
+		           ) u
+		       ), '') as givers
 		FROM gifts g
 		LEFT JOIN guests gu ON gu.id = g.selected_by_guest_id
 	`
@@ -46,13 +56,14 @@ func ListGifts(c *gin.Context) {
 		SelectedByName    string `json:"selected_by_name"`
 		PhotoFilename     string `json:"photo_filename"`
 		LinkURL           string `json:"link_url"`
+		Givers            string `json:"givers"`
 	}
 
 	var gifts []GiftRow
 	for rows.Next() {
 		var g GiftRow
 		if err := rows.Scan(&g.ID, &g.Name, &g.Description, &g.Role, &g.IsPickable,
-			&g.SelectedByGuestID, &g.SelectedByName, &g.PhotoFilename, &g.LinkURL); err != nil {
+			&g.SelectedByGuestID, &g.SelectedByName, &g.PhotoFilename, &g.LinkURL, &g.Givers); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
