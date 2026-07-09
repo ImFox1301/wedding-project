@@ -630,6 +630,20 @@ table.guests-table tbody tr { cursor: pointer; transition: background .12s; }
 .invite-section p,
 .invite-section li,
 .invite-section a { overflow-wrap: break-word; word-break: break-word; }
+/* The global `* { padding:0 }` reset strips list indentation, so bullets/numbers
+   sit flush against the screen edge (and get clipped on mobile). Restore it for
+   editor-created lists. */
+.invite-section ul,
+.invite-section ol,
+.ql-editor ul,
+.ql-editor ol {
+  padding-left: 1.6em;
+  margin: 0 0 1em;
+  list-style-position: outside;
+}
+.invite-section ul { list-style-type: disc; }
+.invite-section ol { list-style-type: decimal; }
+.invite-section li { margin-bottom: .3em; }
 /* Clear floats after each section's text content */
 .invite-section > div::after,
 .ql-editor > *::after {
@@ -850,6 +864,18 @@ table.guests-table tbody tr { cursor: pointer; transition: background .12s; }
 }
 #music-fab-btn.music-fab-pulse { animation: fab-pulse 1.5s ease-in-out infinite; }
 
+/* Playing indicator — gentle beat + expanding ring while audio is playing,
+   shown whether the widget is open or closed. */
+@keyframes fab-playing {
+  0%, 100% { transform: scale(1);    box-shadow: 0 8px 22px rgba(250,35,59,.42), 0 0 0 0 rgba(250,35,59,.45); }
+  50%      { transform: scale(1.08); box-shadow: 0 10px 26px rgba(250,35,59,.5), 0 0 0 14px rgba(250,35,59,0); }
+}
+#music-fab-btn.music-fab-playing { animation: fab-playing 1.4s ease-in-out infinite; }
+#music-fab-btn.music-fab-playing:hover { transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  #music-fab-btn.music-fab-playing { animation: none; }
+}
+
 /* Widget panel — frosted light card */
 #music-widget {
   width: 322px;
@@ -946,6 +972,11 @@ table.guests-table tbody tr { cursor: pointer; transition: background .12s; }
 }
 #music-volume:hover #vol-slider-wrap,
 #music-volume.open #vol-slider-wrap { opacity: 1; visibility: visible; transform: translateY(0); }
+/* iOS/Android ignore programmatic <audio>.volume, so the slider is pointless on
+   mobile — hide the whole control there. */
+@media (max-width: 768px), (pointer: coarse) {
+  #music-volume { display: none; }
+}
 #vol-slider { width: 110px; accent-color: #fa233b; cursor: pointer; }
 #vol-pct {
   font-size: .74rem;

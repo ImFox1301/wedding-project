@@ -278,6 +278,9 @@
       if (npArt) npArt.style.background = artGradient(trackIdx);
       playBtn.innerHTML = playing ? PAUSE_SVG : PLAY_SVG;
       playBtn.classList.toggle('is-playing', playing);
+      // Pulse the FAB while playing — visible whether the widget is open or not.
+      const fabBtn = document.getElementById('music-fab-btn');
+      if (fabBtn) fabBtn.classList.toggle('music-fab-playing', playing);
       renderTrackList();
       // Scroll active track into view
       const active = trackList.querySelector('.music-track-active');
