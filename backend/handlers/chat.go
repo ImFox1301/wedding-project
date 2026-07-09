@@ -28,6 +28,19 @@ type chatHub struct {
 
 var hub = &chatHub{clients: map[string]map[*chatClient]bool{}}
 
+// chatMaxMessages returns the admin-configured max messages kept per room
+// (setting key "chat_max_messages"). Falls back to 200 if unset/invalid.
+// A value <= 0 disables auto-trim.
+func chatMaxMessages() int {
+	var v string
+	db.DB.QueryRow(`SELECT value FROM admin_settings WHERE key='chat_max_messages'`).Scan(&v)
+	n, err := strconv.Atoi(strings.TrimSpace(v))
+	if err != nil {
+		return 200
+	}
+	return n
+}
+
 func (h *chatHub) add(cl *chatClient) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -186,6 +199,13 @@ func ChatWS(c *gin.Context) {
 		out := chatMsgOut{ID: id, Role: room, GuestID: guestID, SenderName: senderName, IsAdmin: isAdmin, Body: body, CreatedAt: createdAt}
 		b, _ := json.Marshal(out)
 		hub.broadcast(room, b)
+
+		// Auto-clear: keep only the newest N messages in this room (N is
+		// admin-configurable via the "chat_max_messages" setting). N<=0 disables.
+		if keep := chatMaxMessages(); keep > 0 {
+			db.DB.Exec(`DELETE FROM chat_messages WHERE role=$1 AND id NOT IN (
+				SELECT id FROM chat_messages WHERE role=$1 ORDER BY id DESC LIMIT $2)`, room, keep)
+		}
 
 		// Sender has implicitly seen up to their own message
 		if guestID != nil {

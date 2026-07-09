@@ -614,6 +614,22 @@ table.guests-table tbody tr { cursor: pointer; transition: background .12s; }
   max-width: 100%;
   height: auto;
 }
+/* Keep every embedded element inside the section — a stray wide table, iframe,
+   video or long unbroken URL is what makes the mobile layout drift sideways. */
+.invite-section img,
+.invite-section video,
+.invite-section iframe,
+.invite-section table,
+.invite-section pre {
+  max-width: 100%;
+}
+.invite-section iframe,
+.invite-section video { height: auto; }
+.invite-section table { display: block; overflow-x: auto; }
+.invite-section > div,
+.invite-section p,
+.invite-section li,
+.invite-section a { overflow-wrap: break-word; word-break: break-word; }
 /* Clear floats after each section's text content */
 .invite-section > div::after,
 .ql-editor > *::after {
@@ -891,6 +907,52 @@ table.guests-table tbody tr { cursor: pointer; transition: background .12s; }
   text-overflow: ellipsis;
   margin-top: 2px;
   line-height: 1.3;
+}
+
+/* Volume — speaker icon with a slider that reveals on hover (or tap on touch) */
+#music-volume { position: relative; flex-shrink: 0; display: flex; align-items: center; }
+#vol-btn {
+  background: none;
+  border: none;
+  color: #1c1c1e;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s ease, opacity .12s ease;
+}
+#vol-btn:hover { background: rgba(0,0,0,.06); }
+#vol-btn:active { transform: scale(.92); }
+#vol-slider-wrap {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(255,255,255,.98);
+  border: 1px solid rgba(0,0,0,.07);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.18);
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(4px);
+  transition: opacity .15s ease, transform .15s ease, visibility .15s;
+  z-index: 5;
+}
+#music-volume:hover #vol-slider-wrap,
+#music-volume.open #vol-slider-wrap { opacity: 1; visibility: visible; transform: translateY(0); }
+#vol-slider { width: 110px; accent-color: #fa233b; cursor: pointer; }
+#vol-pct {
+  font-size: .74rem;
+  color: #6b6b70;
+  font-variant-numeric: tabular-nums;
+  min-width: 34px;
+  text-align: right;
 }
 
 /* Scrubber */
@@ -1804,4 +1866,12 @@ table.guests-table tbody tr { cursor: pointer; transition: background .12s; }
   .invite-body .invite-page { padding: 40px 16px 16px; }
   .invite-body .invite-header { margin-bottom: 40px; }
   .invite-body header { padding: 0 18px; }
+
+  /* Stop the whole page from being pushed sideways by any overflowing child.
+     Fixes the slight layout drift on общие/персональные sections on mobile. */
+  .invite-body { overflow-x: hidden; }
+  .invite-body .invite-page,
+  .invite-body .invite-section,
+  .invite-body .invite-section > div { max-width: 100%; min-width: 0; }
+  .invite-body .invite-section > div { overflow-wrap: break-word; word-break: break-word; }
 }

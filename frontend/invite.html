@@ -43,6 +43,17 @@
           <div id="music-current-name">—</div>
           <div id="music-current-artist"></div>
         </div>
+        <div id="music-volume">
+          <div id="vol-slider-wrap">
+            <input type="range" id="vol-slider" min="0" max="100" value="30" aria-label="Громкость">
+            <span id="vol-pct">30%</span>
+          </div>
+          <button id="vol-btn" type="button" aria-label="Звук" title="Громкость">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+              <path d="M4 9v6h4l5 5V4L8 9H4zm11.5 3a3.5 3.5 0 0 0-2-3.15v6.3A3.5 3.5 0 0 0 15.5 12z"/>
+            </svg>
+          </button>
+        </div>
       </div>
 
       <!-- Scrubber -->
@@ -56,9 +67,15 @@
 
       <!-- Transport -->
       <div id="music-btns">
-        <button class="mc-side" onclick="prevTrack()" aria-label="Предыдущий">⏮</button>
-        <button id="play-btn" onclick="togglePlay()" aria-label="Играть">▶</button>
-        <button class="mc-side" onclick="nextTrack()" aria-label="Следующий">⏭</button>
+        <button class="mc-side" onclick="prevTrack()" aria-label="Предыдущий">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
+        </button>
+        <button id="play-btn" onclick="togglePlay()" aria-label="Играть">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+        <button class="mc-side" onclick="nextTrack()" aria-label="Следующий">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/></svg>
+        </button>
       </div>
 
       <!-- Playlist -->
@@ -195,6 +212,8 @@
     // MUSIC FAB
     // ──────────────────────────────────────────────
     let tracks = [], trackIdx = 0, playing = false;
+    const PLAY_SVG  = '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
+    const PAUSE_SVG = '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>';
     const audioEl   = document.getElementById('audio-el');
     const playBtn   = document.getElementById('play-btn');
     const fabWrap   = document.getElementById('music-fab-wrap');
@@ -257,7 +276,7 @@
       curName.textContent = meta.title;
       if (curArtist) curArtist.textContent = meta.artist || 'Неизвестный исполнитель';
       if (npArt) npArt.style.background = artGradient(trackIdx);
-      playBtn.textContent = playing ? '⏸' : '▶';
+      playBtn.innerHTML = playing ? PAUSE_SVG : PLAY_SVG;
       playBtn.classList.toggle('is-playing', playing);
       renderTrackList();
       // Scroll active track into view
@@ -307,11 +326,35 @@
       widget.classList.toggle('hidden');
     }
 
+    // Volume: default 30%, persisted in localStorage. Slider reveals on hover
+    // over the speaker icon (see #music-volume CSS).
+    function setupVolume() {
+      const slider = document.getElementById('vol-slider');
+      const pct    = document.getElementById('vol-pct');
+      const box    = document.getElementById('music-volume');
+      const btn    = document.getElementById('vol-btn');
+      if (!slider || !audioEl) return;
+      let v = parseInt(localStorage.getItem('music_volume'));
+      if (isNaN(v)) v = 30;
+      v = Math.max(0, Math.min(100, v));
+      const apply = val => {
+        audioEl.volume = val / 100;
+        slider.value   = val;
+        if (pct) pct.textContent = val + '%';
+        localStorage.setItem('music_volume', val);
+      };
+      apply(v);
+      slider.addEventListener('input', () => apply(parseInt(slider.value) || 0));
+      // On touch devices hover doesn't exist — tap the icon to toggle the slider.
+      if (btn && box) btn.addEventListener('click', e => { e.stopPropagation(); box.classList.toggle('open'); });
+    }
+
     async function initMusic() {
       try {
         tracks = await api.guestMusic();
         if (tracks.length) {
           fabWrap.classList.remove('hidden');
+          setupVolume();
           loadTrack(0);
           // Try autoplay; browsers may block it without prior user interaction.
           // If blocked, pulse the FAB and play on first user gesture.
@@ -387,6 +430,11 @@
     async function reloadGifts() {
       try { gifts = await api.guestGifts(); renderGifts(); } catch {}
     }
+
+    // When the chat WS is live, the server echoes a `gift_update` after every
+    // pick/unpick, which triggers reloadGifts() via onGiftUpdate(). In that case
+    // we must NOT also reload directly, or the gift list is fetched twice.
+    function chatWsConnected() { return !!(chatWs && chatWs.readyState === 1); }
 
     // Group gifts: the "Выбрать" button opens a selector of group members.
     function toggleGiftSelect(giftId) {
@@ -611,7 +659,7 @@
     async function pickGift(id) {
       try {
         await api.pickGift(id);
-        await reloadGifts();
+        if (!chatWsConnected()) await reloadGifts();
       } catch (e) {
         showSaveStatus(false, 'Подарок уже был выбран другим гостем.');
         await reloadGifts();
@@ -620,7 +668,7 @@
     async function unpickGift(id) {
       try {
         await api.unpickGift(id);
-        await reloadGifts();
+        if (!chatWsConnected()) await reloadGifts();
       } catch (e) {
         showSaveStatus(false, 'Не удалось отменить выбор.');
         await reloadGifts();
@@ -846,6 +894,9 @@
     // ──────────────────────────────────────────────
     async function renderPage(data) {
       _data = data;
+      // The "Я Гоша" button flees into <body> (position:fixed); remove any stray
+      // copy from a previous render so re-renders don't accumulate duplicates.
+      document.querySelectorAll('body > .gosha-btn').forEach(b => b.remove());
       const { guests, role, sections, friend_response: fr,
               friend_responses: frResponses,
               family_responses: fmResponses,
@@ -1180,7 +1231,10 @@
       const token  = params.get('token');
 
       if (token) {
-        // Public token — open without login
+        // Public token — open without login. Guests invited by link have no
+        // account to sign out of, so hide the logout button.
+        const logoutBtn = document.querySelector('.btn-logout');
+        if (logoutBtn) logoutBtn.style.display = 'none';
         try {
           const data = await api.invite(token);
           if (data.error) {

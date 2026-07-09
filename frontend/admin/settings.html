@@ -136,6 +136,20 @@
         </form>
       </div>
 
+      <!-- Chat settings -->
+      <div class="card mb-16">
+        <div class="card-header"><h2>💬 Чат — автоочистка истории</h2></div>
+        <p class="text-muted mb-16">Если в чате больше указанного числа сообщений, самые старые автоматически удаляются. Задаётся отдельно для каждой комнаты (друзья/родственники). 0 — не очищать.</p>
+        <form id="chat-form">
+          <div class="form-group">
+            <label>Максимум сообщений в чате</label>
+            <input type="number" min="0" step="1" class="form-control" id="chat-max-messages"
+              placeholder="200" style="max-width:200px">
+          </div>
+          <button type="submit" class="btn btn-primary">Сохранить</button>
+        </form>
+      </div>
+
       <!-- Cottage date range -->
       <div class="card mb-16">
         <div class="card-header"><h2>🏡 Коттедж — допустимый период пребывания</h2></div>
@@ -180,6 +194,9 @@
          'label_loft_title', 'label_loft_desc',
          'label_transport_title', 'label_transport_desc'
         ].forEach(k => { document.getElementById(k).value = s[k] || ''; });
+
+        document.getElementById('chat-max-messages').value =
+          (s['chat_max_messages'] != null && s['chat_max_messages'] !== '') ? s['chat_max_messages'] : '200';
 
         cottageFrom = s['cottage_date_from'] || '';
         cottageTo   = s['cottage_date_to']   || '';
@@ -257,6 +274,19 @@
       try {
         await api.settings.update(data);
         showAlert(document.getElementById('alert-container'), 'Подписи опций сохранены');
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    });
+
+    // Chat max messages
+    document.getElementById('chat-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      let n = parseInt(document.getElementById('chat-max-messages').value, 10);
+      if (isNaN(n) || n < 0) n = 0;
+      try {
+        await api.settings.update({ chat_max_messages: String(n) });
+        showAlert(document.getElementById('alert-container'), 'Настройки чата сохранены');
       } catch (err) {
         showAlert(document.getElementById('alert-container'), err.message, 'danger');
       }

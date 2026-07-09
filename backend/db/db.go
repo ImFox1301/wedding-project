@@ -177,7 +177,8 @@ func Migrate() {
 			('label_loft_title',       'Еду в лофт'),
 			('label_loft_desc',        'Празднование в лофте'),
 			('label_transport_title',  'Нужен транспорт до лофта'),
-			('label_transport_desc',   'Организованный трансфер')
+			('label_transport_desc',   'Организованный трансфер'),
+			('chat_max_messages',      '200')
 		ON CONFLICT (key) DO NOTHING`,
 	}
 
