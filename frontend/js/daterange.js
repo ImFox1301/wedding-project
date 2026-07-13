@@ -142,17 +142,13 @@ class DateRangePicker {
 
       const tooEarly    = this.minDate   && date <  this.minDate;
       const tooLate     = this.maxDate   && date >  this.maxDate;
-      const beforeFixed = this.fixedFrom && date <= this.fixedFrom;
+      // Only dates strictly before the fixed arrival are blocked — the arrival
+      // day itself must remain selectable as the departure (same-day, 0 nights).
+      const beforeFixed = this.fixedFrom && date < this.fixedFrom;
 
       if (tooEarly || tooLate || beforeFixed) {
-        // Special case: show fixedFrom date itself as highlighted (non-clickable) range start
-        if (this.fixedFrom && this._eq(date, this.fixedFrom)) {
-          cls += ' drp-rs';
-          cells += `<div class="${cls}">${d}</div>`;
-        } else {
-          cls += ' drp-disabled';
-          cells += `<div class="${cls}">${d}</div>`;
-        }
+        cls += ' drp-disabled';
+        cells += `<div class="${cls}">${d}</div>`;
         continue;
       }
 

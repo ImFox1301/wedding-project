@@ -1537,35 +1537,46 @@ body.has-preview-banner { padding-top: 46px; }
 }
 
 /* ===== SECTIONS ===== */
-/* Each section is a soft card so that, with many sections, they read as distinct
-   blocks instead of merging into one long wall of text. */
+/* Each section is a warm "paper panel" — distinct enough that many sections stay
+   visually separate, but soft and editorial rather than a stark form card. */
 .invite-body .invite-section {
   position: relative;
-  background: #fff;
-  border: 1px solid #ececea;
-  border-radius: 18px;
-  padding: 30px 32px;
-  margin-bottom: 26px;
-  box-shadow: 0 6px 22px rgba(0,0,0,.05);
+  background: rgba(255,255,255,.55);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  border: 1px solid rgba(176,154,112,.26);
+  border-radius: 6px;
+  padding: 34px 36px 30px;
+  margin-bottom: 30px;
+  box-shadow: 0 12px 34px rgba(120,100,70,.07);
 }
-/* Warm accent stripe along the top edge to reinforce the boundary. */
+/* Hairline inner frame — an engraving-style double border, not a colored bar. */
 .invite-body .invite-section::before {
   content: "";
   position: absolute;
-  top: 0;
-  left: 26px;
-  right: 26px;
-  height: 3px;
-  border-radius: 0 0 3px 3px;
-  background: linear-gradient(90deg, transparent, #d8c3a3 20%, #b98e56 50%, #d8c3a3 80%, transparent);
+  inset: 5px;
+  border: 1px solid rgba(176,154,112,.18);
+  border-radius: 3px;
+  pointer-events: none;
 }
+.invite-body .invite-section > * { position: relative; }
 .invite-body .invite-section h2 {
   font-family: var(--serif);
   font-weight: 600;
-  font-size: 1.75rem;
-  letter-spacing: .3px;
+  font-size: 1.9rem;
+  letter-spacing: .4px;
+  text-align: center;
   color: var(--ink);
-  margin-bottom: 16px;
+  margin: 4px 0 20px;
+}
+/* Small serif flourish under each heading. */
+.invite-body .invite-section h2::after {
+  content: "✦";
+  display: block;
+  font-size: .72rem;
+  letter-spacing: .3em;
+  color: #c2a878;
+  margin: 9px 0 0;
 }
 .invite-body .invite-section > div { line-height: 1.75; color: var(--ink-2); }
 
@@ -1939,8 +1950,8 @@ body.has-preview-banner { padding-top: 46px; }
   .invite-body .invite-page { padding: 40px 14px 16px; }
   .invite-body .invite-header { margin-bottom: 40px; }
   .invite-body header { padding: 0 18px; }
-  .invite-body .invite-section { padding: 22px 18px; border-radius: 14px; }
-  .invite-body .invite-section::before { left: 16px; right: 16px; }
+  .invite-body .invite-section { padding: 26px 20px 22px; border-radius: 6px; }
+  .invite-body .invite-section h2 { font-size: 1.6rem; }
 
   /* Stop the whole page from being pushed sideways by any overflowing child.
      Fixes the slight layout drift on общие/персональные sections on mobile. */
