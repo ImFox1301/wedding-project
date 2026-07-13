@@ -2798,3 +2798,21 @@ body.has-preview-banner { padding-top: 46px; }
 /* Scrollbars — light */
 .theme-light .admin-body ::-webkit-scrollbar-thumb { background: rgba(20,30,50,.2); }
 .theme-light .admin-body ::-webkit-scrollbar-thumb:hover { background: rgba(20,30,50,.32); }
+
+/* ==================================================================
+   Personal sections list (admin) — theme-aware fixes.
+   The page <style> hardcodes white cards; these override for both
+   dark (default) and light (.theme-light) themes via variables.
+   ================================================================== */
+.admin-body .ps-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.admin-body .ps-title { color: var(--text); }
+.admin-body .ps-preview { color: var(--muted); }
+.admin-body .badge-lock {
+  background: var(--surface-2);
+  color: var(--text-2);
+  border: 1px solid var(--border-strong);
+}
+.admin-body .photo-thumb-ps { border-color: var(--border-strong); }

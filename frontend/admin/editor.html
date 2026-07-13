@@ -591,8 +591,10 @@
       document.getElementById('section-id').value    = '';
       document.getElementById('section-title').value = '';
       quill.root.innerHTML = '';
-      // Photos need a saved section — hide until it exists
-      document.getElementById('photos-block').style.display = 'none';
+      // New section: photos are queued locally and uploaded after create
+      pendingPhotos = [];
+      renderPendingPhotos();
+      document.getElementById('photos-block').style.display = '';
       document.getElementById('section-modal').classList.add('active');
       setTimeout(() => quill.focus(), 120);
     }
@@ -606,6 +608,7 @@
       if (content.trim().startsWith('<')) quill.root.innerHTML = content;
       else quill.root.innerHTML = content.split('\n').map(l => `<p>${l || '<br>'}</p>`).join('');
       document.getElementById('photos-block').style.display = '';
+      pendingPhotos = [];
       renderModalPhotos(s);
       document.getElementById('section-modal').classList.add('active');
       setTimeout(() => quill.focus(), 120);
@@ -627,10 +630,34 @@
       }
     }
 
+    // Photos selected before the section exists: queued locally and
+    // uploaded right after creation.
+    let pendingPhotos = [];
+
+    function renderPendingPhotos() {
+      const wrap = document.getElementById('photo-thumbs');
+      wrap.innerHTML = pendingPhotos.map((f, i) => `
+        <div class="photo-thumb-ps">
+          <img src="${URL.createObjectURL(f)}" alt="">
+          <button type="button" onclick="removePendingPhoto(${i})" title="Убрать">✕</button>
+        </div>`).join('') || '<span class="text-muted" style="font-size:.8rem">Нет фото</span>';
+    }
+    function removePendingPhoto(i) {
+      pendingPhotos.splice(i, 1);
+      renderPendingPhotos();
+    }
+
     async function uploadPhotos(input) {
       const sectionId = parseInt(document.getElementById('section-id').value);
       const files = [...input.files];
-      if (!sectionId || !files.length) return;
+      if (!files.length) return;
+      if (!sectionId) {
+        // Section doesn't exist yet — queue and upload after create
+        pendingPhotos.push(...files);
+        renderPendingPhotos();
+        input.value = '';
+        return;
+      }
       try {
         for (const f of files) {
           const form = new FormData();
@@ -674,8 +701,18 @@
         order:   currentOrder,
       };
       try {
-        if (id) await api.sections.update(id, data);
-        else    await api.sections.create(data);
+        if (id) {
+          await api.sections.update(id, data);
+        } else {
+          const created = await api.sections.create(data);
+          // Upload photos queued during creation
+          for (const f of pendingPhotos) {
+            const form = new FormData();
+            form.append('photo', f);
+            await api.sections.uploadPhoto(created.id, form);
+          }
+          pendingPhotos = [];
+        }
         closeSectionModal();
         await load();
         showAlert(document.getElementById('alert-container'), id ? 'Раздел обновлён' : 'Раздел добавлен');

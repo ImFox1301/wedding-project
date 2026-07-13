@@ -229,11 +229,13 @@
       document.getElementById('target-pickers').style.display = '';
       document.getElementById('target-label').style.display = 'none';
       document.getElementById('lock-notice').style.display = 'none';
-      document.getElementById('photos-block').style.display = 'none';
+      document.getElementById('photos-block').style.display = '';
       document.getElementById('delete-btn').style.display = 'none';
       document.getElementById('save-btn').style.display = '';
       document.getElementById('ps-title').value = '';
       quill.root.innerHTML = '';
+      pendingPhotos = [];
+      renderPendingPhotos();
       setReadonly(false);
       fillTargets();
       document.getElementById('ps-modal').classList.add('active');
@@ -256,6 +258,7 @@
       if (content.trim().startsWith('<')) quill.root.innerHTML = content;
       else quill.root.innerHTML = content.split('\n').map(l => `<p>${l || '<br>'}</p>`).join('');
       setReadonly(s.locked);
+      pendingPhotos = [];
       renderPhotos(s);
       document.getElementById('photos-block').style.display = s.locked ? 'none' : '';
       document.getElementById('ps-modal').classList.add('active');
@@ -277,9 +280,34 @@
 
     function closeModal() { document.getElementById('ps-modal').classList.remove('active'); }
 
+    // Photos selected before the section exists: queued locally and
+    // uploaded right after creation.
+    let pendingPhotos = [];
+
+    function renderPendingPhotos() {
+      const wrap = document.getElementById('photo-thumbs');
+      wrap.innerHTML = pendingPhotos.map((f, i) => `
+        <div class="photo-thumb-ps">
+          <img src="${URL.createObjectURL(f)}" alt="">
+          <button type="button" onclick="removePendingPhoto(${i})" title="Убрать">✕</button>
+        </div>`).join('') || '<span class="text-muted" style="font-size:.8rem">Нет фото</span>';
+    }
+    function removePendingPhoto(i) {
+      pendingPhotos.splice(i, 1);
+      renderPendingPhotos();
+    }
+
     async function uploadPhotos(input) {
       const files = [...input.files];
-      if (!files.length || !editingId) return;
+      if (!files.length) return;
+      if (createMode) {
+        // Section doesn't exist yet — queue and upload after create
+        pendingPhotos.push(...files);
+        renderPendingPhotos();
+        input.value = '';
+        return;
+      }
+      if (!editingId) return;
       try {
         for (const f of files) {
           const form = new FormData();
@@ -321,7 +349,14 @@
           if (!tid) { showAlert(document.getElementById('alert-container'), 'Выберите гостя или группу', 'danger'); return; }
           const body = { title, content };
           if (type === 'guest') body.guest_id = tid; else body.group_id = tid;
-          await api.personalSections.create(body);
+          const created = await api.personalSections.create(body);
+          // Upload photos queued during creation
+          for (const f of pendingPhotos) {
+            const form = new FormData();
+            form.append('photo', f);
+            await api.sections.uploadPhoto(created.id, form);
+          }
+          pendingPhotos = [];
         } else {
           await api.sections.update(editingId, { title, content, order: 0 });
         }
