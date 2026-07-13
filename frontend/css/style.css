@@ -2553,3 +2553,248 @@ body.has-preview-banner { padding-top: 46px; }
   .admin-body .sidebar { border-bottom: 1px solid var(--border); }
   .admin-body .sidebar a.active { border-bottom-color: var(--accent); background: rgba(143,177,221,.12); }
 }
+/* ==================================================================
+   ================  THEME TOGGLE + LIGHT THEME  ====================
+   Dark is the default. <html class="theme-light"> switches both the
+   invitation (.invite-body) and the admin panel (.admin-body) to a
+   light variant. Toggled by /js/theme.js (persisted in localStorage).
+   ================================================================== */
+
+/* ── Toggle button (both scopes, both themes) ── */
+.invite-body .theme-toggle,
+.admin-body .theme-toggle {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0;
+  transition: background .2s, border-color .2s, color .2s, transform .12s;
+}
+.invite-body .theme-toggle:hover,
+.admin-body .theme-toggle:hover {
+  background: var(--surface-2);
+  border-color: rgba(127,127,127,.45);
+  color: var(--text);
+}
+.invite-body .theme-toggle:active,
+.admin-body .theme-toggle:active { transform: scale(.92); }
+.invite-body .theme-toggle svg,
+.admin-body .theme-toggle svg { display: block; }
+
+/* ==================================================================
+   ================  LIGHT THEME — INVITE PAGES  ====================
+   ================================================================== */
+
+.theme-light .invite-body {
+  --bg:            #f3f5f9;
+  --surface:       #ffffff;
+  --surface-2:     #eef1f6;
+  --border:        rgba(20,30,50,.1);
+  --border-strong: rgba(20,30,50,.18);
+
+  --text:   #1b2434;
+  --text-2: #3a4356;
+  --muted:  #6e7788;
+
+  --accent:    #3f639b;
+  --accent-2:  #2f4f81;
+
+  --success:    #178a60;
+  --success-bg: rgba(23,138,96,.1);
+  --danger:     #c0473f;
+  --danger-bg:  rgba(192,71,63,.08);
+
+  background:
+    radial-gradient(1000px 620px at 14% -12%, rgba(99,131,175,.12), transparent 62%),
+    radial-gradient(880px 540px at 90% -6%, rgba(63,99,155,.07), transparent 58%),
+    var(--bg);
+  background-attachment: fixed;
+}
+.theme-light .invite-body ::selection { background: rgba(143,177,221,.5); color: #10131a; }
+
+.theme-light .invite-body header {
+  background: rgba(255,255,255,.8);
+  -webkit-backdrop-filter: saturate(1.4) blur(14px);
+  backdrop-filter: saturate(1.4) blur(14px);
+}
+.theme-light .invite-body header .btn-logout:hover { border-color: rgba(20,30,50,.3); }
+
+.theme-light .invite-body .invite-header h1 {
+  background: linear-gradient(120deg, #16213a 25%, #31517f 70%, #4c74a8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.theme-light .invite-body .invite-ornament .line {
+  background: linear-gradient(90deg, transparent, rgba(63,99,155,.5));
+}
+.theme-light .invite-body .invite-ornament .line:last-child {
+  background: linear-gradient(90deg, rgba(63,99,155,.5), transparent);
+}
+
+.theme-light .invite-body .invite-section {
+  box-shadow: 0 10px 30px rgba(23,32,50,.08);
+}
+.theme-light .invite-body .invite-section::before {
+  background: linear-gradient(90deg, transparent, rgba(63,99,155,.3), transparent);
+}
+
+.theme-light .invite-body .form-control { background: #fff; }
+.theme-light .invite-body .form-control:focus { background: #fff; box-shadow: 0 0 0 3px rgba(63,99,155,.15); }
+.theme-light .invite-body select.form-control { background: #fff; }
+.theme-light .invite-body select.form-control option { background: #fff; color: var(--text); }
+
+.theme-light .invite-body .btn-attend.no:hover { border-color: rgba(20,30,50,.3); }
+
+.theme-light .invite-body .option-card:hover { border-color: rgba(20,30,50,.24); }
+.theme-light .invite-body .option-icon { background: rgba(20,30,50,.05); }
+.theme-light .invite-body .option-check { border-color: rgba(20,30,50,.28); }
+
+.theme-light .invite-body .gift-card:hover { box-shadow: 0 12px 26px rgba(23,32,50,.12); }
+.theme-light .invite-body .gift-card.picked-by-other { background: rgba(20,30,50,.02); }
+.theme-light .invite-body .gift-card-actions button { background: rgba(20,30,50,.03); }
+.theme-light .invite-body .gift-card-actions button:not(:disabled):hover { background: rgba(20,30,50,.07); }
+
+.theme-light .invite-body .section-gallery-thumb:hover { border-color: rgba(20,30,50,.4); }
+.theme-light .invite-body .sg-dot { background: rgba(20,30,50,.25); }
+.theme-light .invite-body .sg-dot.active { background: var(--accent); }
+
+.theme-light .invite-body .drp-wrap { background: #fff; }
+.theme-light .invite-body .drp-cell.drp-disabled { color: rgba(20,30,50,.25); }
+
+.theme-light .invite-body .login-card { box-shadow: 0 18px 50px rgba(23,32,50,.12); }
+.theme-light .invite-body .login-card::before {
+  background: linear-gradient(90deg, transparent, rgba(63,99,155,.35), transparent);
+}
+
+/* Chat widget — light */
+.theme-light .invite-body #chat-badge { border-color: #f3f5f9; }
+.theme-light .invite-body #chat-panel {
+  background: rgba(255,255,255,.96);
+  box-shadow: 0 24px 60px rgba(23,32,50,.22);
+}
+.theme-light .invite-body #chat-info { background: rgba(20,30,50,.04); }
+.theme-light .invite-body #chat-input { background: #fff; }
+.theme-light .invite-body #chat-input:focus { box-shadow: 0 0 0 3px rgba(63,99,155,.15); }
+.theme-light .invite-body .chat-msg-bubble { background: #f2f4f8; }
+.theme-light .invite-body .chat-msg.mine .chat-msg-bubble { background: var(--grad); color: #fff; }
+.theme-light .invite-body .chat-msg.admin:not(.mine) .chat-msg-bubble { background: rgba(63,99,155,.08); }
+
+/* Music widget — light */
+.theme-light .invite-body #music-widget {
+  background: rgba(255,255,255,.96);
+  box-shadow: 0 24px 60px rgba(23,32,50,.22);
+}
+.theme-light .invite-body #vol-btn:hover { background: rgba(20,30,50,.06); }
+.theme-light .invite-body #vol-slider-wrap {
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(23,32,50,.18);
+}
+.theme-light .invite-body #music-progress-bar { background: rgba(20,30,50,.12); }
+.theme-light .invite-body .music-track-item:hover { background: rgba(20,30,50,.05); }
+
+/* Scrollbars — light */
+.theme-light .invite-body #music-track-list::-webkit-scrollbar-thumb,
+.theme-light .invite-body #chat-messages::-webkit-scrollbar-thumb { background: rgba(20,30,50,.2); }
+.theme-light .invite-body #music-track-list::-webkit-scrollbar-thumb:hover,
+.theme-light .invite-body #chat-messages::-webkit-scrollbar-thumb:hover { background: rgba(20,30,50,.32); }
+
+/* ==================================================================
+   ================  LIGHT THEME — ADMIN PANEL  =====================
+   ================================================================== */
+
+.theme-light .admin-body {
+  --bg:            #f3f5f9;
+  --surface:       #ffffff;
+  --surface-2:     #eef1f6;
+  --border:        rgba(20,30,50,.1);
+  --border-strong: rgba(20,30,50,.18);
+
+  --text:   #1b2434;
+  --text-2: #3a4356;
+  --muted:  #6e7788;
+
+  --accent:    #3f639b;
+  --accent-2:  #2f4f81;
+
+  --success:    #178a60;
+  --success-bg: rgba(23,138,96,.1);
+  --danger:     #c0473f;
+  --danger-bg:  rgba(192,71,63,.08);
+
+  background:
+    radial-gradient(900px 500px at 20% -14%, rgba(99,131,175,.08), transparent 60%),
+    var(--bg);
+  background-attachment: fixed;
+}
+.theme-light .admin-body ::selection { background: rgba(143,177,221,.5); color: #10131a; }
+
+.theme-light .admin-body header {
+  background: rgba(255,255,255,.85);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+.theme-light .admin-body .sidebar { background: #fff; }
+.theme-light .admin-body .sidebar .sidebar-section { color: rgba(20,30,50,.4); }
+
+.theme-light .admin-body th { background: rgba(20,30,50,.04); }
+.theme-light .admin-body tr:hover td { background: rgba(20,30,50,.03); }
+
+.theme-light .admin-body .form-control { background: #fff; }
+.theme-light .admin-body .form-control:focus { box-shadow: 0 0 0 3px rgba(63,99,155,.15); }
+.theme-light .admin-body select.form-control { background: #fff; }
+.theme-light .admin-body select.form-control option { background: #fff; color: var(--text); }
+
+.theme-light .admin-body .modal {
+  background: #fff;
+  box-shadow: 0 24px 60px rgba(23,32,50,.25);
+}
+.theme-light .admin-body .salu-preview { background: #f7f9fc; }
+.theme-light .admin-body .switch .track { background: rgba(20,30,50,.2); }
+.theme-light .admin-body .drag-handle,
+.theme-light .admin-body .section-drag-handle,
+.theme-light .admin-body .track-drag-handle { color: rgba(20,30,50,.3); }
+.theme-light .admin-body .link-copy { background: #f6f8fb; }
+.theme-light .admin-body .role-tag:hover { border-color: rgba(20,30,50,.35); }
+
+/* Cool-blue badges/alerts need darker text on light */
+.theme-light .admin-body .alert-info    { background: rgba(37,99,168,.08); color: #2563a8; border-color: rgba(37,99,168,.3); }
+.theme-light .admin-body .badge-family  { background: rgba(37,99,168,.1); color: #2563a8; }
+.theme-light .admin-body .badge-admin   { background: rgba(109,74,201,.1); color: #6d4ac9; }
+.theme-light .admin-body .gift-tag.has-link { background: rgba(37,99,168,.1); color: #2563a8; }
+.theme-light .admin-body .link-card-icon.guest-icon { background: rgba(37,99,168,.1); }
+
+/* Charts */
+.theme-light .admin-body .chart-bar-track { background: rgba(20,30,50,.08); }
+.theme-light .admin-body .metric-progress .mp-track { background: rgba(20,30,50,.08); }
+.theme-light .admin-body .donut circle:first-child { stroke: rgba(20,30,50,.1); }
+
+/* Chat (admin) */
+.theme-light .admin-body .chat-msg-bubble { background: #f2f4f8; }
+.theme-light .admin-body .chat-msg.mine .chat-msg-bubble { background: var(--grad); color: #fff; }
+.theme-light .admin-body .chat-msg.admin:not(.mine) .chat-msg-bubble { background: rgba(63,99,155,.08); }
+
+/* Per-page cards */
+.theme-light .admin-body .section-card:hover,
+.theme-light .admin-body .gift-admin-card:hover,
+.theme-light .admin-body .link-card:hover,
+.theme-light .admin-body .track-card:hover { box-shadow: 0 8px 20px rgba(23,32,50,.12); }
+.theme-light .admin-body .gift-admin-thumb-placeholder { background: rgba(20,30,50,.05); }
+.theme-light .admin-body .gift-tag { background: rgba(20,30,50,.06); }
+.theme-light .admin-body .link-card-url { background: #f6f8fb; }
+
+/* Quill — light */
+.theme-light .admin-body .ql-toolbar { background: #f6f8fb; }
+.theme-light .admin-body .ql-container { background: #fff; }
+.theme-light .admin-body .ql-snow .ql-picker-options { background: #fff; }
+
+/* Scrollbars — light */
+.theme-light .admin-body ::-webkit-scrollbar-thumb { background: rgba(20,30,50,.2); }
+.theme-light .admin-body ::-webkit-scrollbar-thumb:hover { background: rgba(20,30,50,.32); }
