@@ -4,7 +4,9 @@ import (
 	"database/sql"
 	"net/http"
 	"strconv"
+	"strings"
 	"wedding/db"
+	"wedding/middleware"
 
 	"github.com/gin-gonic/gin"
 )
@@ -13,6 +15,18 @@ import (
 // GetInvitePage resolves a token, marks visit, returns page data for the guest
 func GetInvitePage(c *gin.Context) {
 	token := c.Param("token")
+
+	// Preview mode (admin only): render the exact page a guest would see, but
+	// do NOT record a visit and do NOT issue a guest token. Requires a valid
+	// admin JWT so guests can't use it to dodge visit stats.
+	preview := c.Query("preview") == "1"
+	if preview {
+		claims, err := middleware.ParseToken(strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer "))
+		if err != nil || claims.Role != "admin" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+			return
+		}
+	}
 
 	// Find link
 	var linkID int
@@ -50,9 +64,11 @@ func GetInvitePage(c *gin.Context) {
 		).Scan(&g.ID, &g.LastName, &g.FirstName, &g.MiddleName, &g.Role, &g.Gender, &g.CustomSalutation, &g.AmIGosha)
 		guests = append(guests, g)
 
-		// Mark visited
-		db.DB.Exec(`UPDATE guests SET visited=TRUE, visited_at=NOW() WHERE id=$1`, *guestID)
-		db.DB.Exec(`INSERT INTO visit_logs (guest_id, link_token) VALUES ($1,$2)`, *guestID, token)
+		// Mark visited (skipped in preview)
+		if !preview {
+			db.DB.Exec(`UPDATE guests SET visited=TRUE, visited_at=NOW() WHERE id=$1`, *guestID)
+			db.DB.Exec(`INSERT INTO visit_logs (guest_id, link_token) VALUES ($1,$2)`, *guestID, token)
+		}
 	} else if groupID != nil {
 		rows, _ := db.DB.Query(
 			`SELECT id, last_name, first_name, middle_name, role, gender, custom_salutation, am_i_gosha FROM guests WHERE group_id=$1`, *groupID,
@@ -63,10 +79,14 @@ func GetInvitePage(c *gin.Context) {
 				var g GuestInfo
 				rows.Scan(&g.ID, &g.LastName, &g.FirstName, &g.MiddleName, &g.Role, &g.Gender, &g.CustomSalutation, &g.AmIGosha)
 				guests = append(guests, g)
-				db.DB.Exec(`UPDATE guests SET visited=TRUE, visited_at=NOW() WHERE id=$1`, g.ID)
+				if !preview {
+					db.DB.Exec(`UPDATE guests SET visited=TRUE, visited_at=NOW() WHERE id=$1`, g.ID)
+				}
 			}
 		}
-		db.DB.Exec(`INSERT INTO visit_logs (link_token) VALUES ($1)`, token)
+		if !preview {
+			db.DB.Exec(`INSERT INTO visit_logs (link_token) VALUES ($1)`, token)
+		}
 	}
 
 	if len(guests) == 0 {
@@ -349,6 +369,7 @@ func GetInvitePage(c *gin.Context) {
 		"group_id":          groupID,
 		"guest_token":       guestToken,
 		"guest_id":          primaryGuest.ID,
+		"preview":           preview,
 	})
 }
 

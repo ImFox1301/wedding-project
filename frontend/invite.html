@@ -877,6 +877,7 @@
     // ATTENDANCE ("Приду / Не приду")
     // ──────────────────────────────────────────────
     let _data = null;
+    let _preview = false;
     let musicInited = false;
 
     async function setAttendance(val) {
@@ -948,7 +949,8 @@
 
       // ── Attendance gate ──
       // Until the guest chooses "Приду", the page content is hidden.
-      if (attending !== true) {
+      // In preview the admin sees the full invitation, so the gate is skipped.
+      if (!_preview && attending !== true) {
         if (attending === false) {
           html += `
             <div class="invite-section attend-block reveal">
@@ -1122,8 +1124,8 @@
         </div>`;
       }
 
-      // Discreet way to change the answer back to "Не приду"
-      html += `<div class="attend-change"><button onclick="setAttendance(false)">Не смогу прийти</button></div>`;
+      // Discreet way to change the answer back to "Не приду" (hidden in preview)
+      if (!_preview) html += `<div class="attend-change"><button onclick="setAttendance(false)">Не смогу прийти</button></div>`;
 
       html += `</div>`; // invite-page
       document.getElementById('page-content').innerHTML = html;
@@ -1221,9 +1223,21 @@
         await reloadGifts();
       }
 
-      // Music + chat (init once; live outside page-content, survive re-renders)
-      if (getToken() && !musicInited) { musicInited = true; await initMusic(); }
-      if (getToken() && !chatInited)  { chatInited  = true; await initChat();  }
+      // Music + chat (init once; live outside page-content, survive re-renders).
+      // Skipped in preview — no autoplay, no live chat websocket for the admin.
+      if (!_preview && getToken() && !musicInited) { musicInited = true; await initMusic(); }
+      if (!_preview && getToken() && !chatInited)  { chatInited  = true; await initChat();  }
+    }
+
+    // Fixed banner shown in preview mode so it's obvious this isn't the live page.
+    function showPreviewBanner() {
+      if (document.getElementById('preview-banner')) return;
+      const bar = document.createElement('div');
+      bar.id = 'preview-banner';
+      bar.innerHTML = '👁 Режим предпросмотра — гость это не увидит. Взаимодействие отключено, посещение не засчитывается.'
+        + '<button onclick="window.close()">Закрыть</button>';
+      document.body.appendChild(bar);
+      document.body.classList.add('has-preview-banner');
     }
 
     // ──────────────────────────────────────────────
@@ -1232,6 +1246,36 @@
     async function init() {
       const params = new URLSearchParams(window.location.search);
       const token  = params.get('token');
+      _preview     = params.get('preview') === '1';
+
+      // ── Admin preview ──
+      // Renders exactly what the guest sees, but read-only: no visit is recorded,
+      // interaction is blocked, and "Приду/Не приду" is removed. Uses the admin
+      // session already present in localStorage to authorize the preview fetch.
+      if (token && _preview) {
+        const logoutBtn = document.querySelector('.btn-logout');
+        if (logoutBtn) logoutBtn.style.display = 'none';
+        try {
+          const data = await api.invitePreview(token);
+          if (data.error) {
+            document.getElementById('page-content').innerHTML =
+              `<div style="text-align:center;padding:60px;color:#c00">${data.error}</div>`;
+            return;
+          }
+          // Confine the guest read-token to THIS tab so the admin session in
+          // other tabs is never overwritten. Enables read-only calls (gifts).
+          if (data.guest_token) sessionStorage.setItem('token', data.guest_token);
+          await renderPage(data);
+          showPreviewBanner();
+          // Block ALL interaction while keeping the page scrollable.
+          const pc = document.getElementById('page-content');
+          if (pc) { pc.inert = true; pc.style.pointerEvents = 'none'; pc.style.userSelect = 'none'; }
+        } catch (err) {
+          document.getElementById('page-content').innerHTML =
+            `<div style="text-align:center;padding:60px;color:#c00">Ошибка предпросмотра: ${err.message}</div>`;
+        }
+        return;
+      }
 
       if (token) {
         // Public token — open without login. Guests invited by link have no

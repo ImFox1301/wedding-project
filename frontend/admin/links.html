@@ -277,7 +277,7 @@
           </div>
 
           <div class="link-card-footer">
-            <span></span>
+            <button class="btn btn-secondary btn-sm" onclick="previewLink('${l.token}')">👁 Предпросмотр</button>
             <button class="btn btn-danger btn-sm" onclick="deleteLink(${l.id})">🗑 Удалить</button>
           </div>
         </div>
@@ -343,6 +343,10 @@
       } catch (err) {
         console.error('Copy failed:', err);
       }
+    }
+
+    function previewLink(token) {
+      window.open(`${getBase()}/invite.html?token=${token}&preview=1`, '_blank');
     }
 
     function openModal() {

@@ -1,7 +1,11 @@
 const API_BASE = '/api';
 
 function getToken() {
-  return localStorage.getItem('token');
+  // A tab-scoped token (sessionStorage) takes precedence over the shared
+  // localStorage one. Used by admin link preview so the guest token used for
+  // read-only calls stays confined to the preview tab and never clobbers the
+  // admin session in other tabs.
+  return sessionStorage.getItem('token') || localStorage.getItem('token');
 }
 
 function setAuth(token, role, guestId) {
@@ -161,6 +165,8 @@ const api = {
 
   // Guest
   invite: (token) => fetch(API_BASE + '/invite/' + token).then(r => r.json()),
+  // Admin-only preview: sends admin auth, records no visit, issues no interaction rights.
+  invitePreview: (token) => apiRequest('GET', '/invite/' + token + '?preview=1'),
 
   guestMe:      ()           => api.get('/guest/me'),
   saveFriend:   (data)       => api.put('/guest/response/friend', data),
