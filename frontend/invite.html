@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@300;400;500;600&display=swap&subset=cyrillic,latin">
+        href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&display=swap">
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body class="invite-body">
@@ -20,7 +20,7 @@
   </header>
 
   <div id="page-content">
-    <div style="text-align:center;padding:60px;color:#888">Загрузка приглашения...</div>
+    <div class="page-status">Загрузка приглашения...</div>
   </div>
 
   <!-- Music FAB -->
@@ -470,7 +470,7 @@
 
       // Общее (non-pickable) — shown without pick controls
       if (notPickable.length) {
-        html += `<h3 style="margin:0 0 12px;color:#555">Общее</h3>
+        html += `<h3 class="gifts-subhead">Общее</h3>
           <div class="gifts-grid mb-16">
             ${notPickable.map(g => `
               <div class="gift-card">
@@ -483,7 +483,7 @@
 
       // Pickable gifts
       if (pickable.length) {
-        if (notPickable.length) html += `<h3 style="margin:0 0 12px;color:#555">Выберите подарок</h3>`;
+        if (notPickable.length) html += `<h3 class="gifts-subhead">Выберите подарок</h3>`;
         html += `<div class="gifts-grid">
           ${pickable.map(g => {
             // Photo / link action bar (shared by both modes)
@@ -508,7 +508,7 @@
                 // Claimed by a single guest or another group → locked
                 cls += ' picked-by-other';
                 pickArea = `
-                  <span class="gift-badge" style="background:#f8d7da;color:#721c24">Занят</span>
+                  <span class="gift-badge badge-taken">Занят</span>
                   <h4>${g.name}</h4>
                   ${g.description ? `<div class="gift-desc">${g.description}</div>` : ''}
                   ${g.giver_names ? `<div class="gift-taken-by">Выбрали: ${g.giver_names}</div>` : ''}`;
@@ -533,11 +533,11 @@
               let badge = '', pickBtn = '';
               if (g.is_my_pick) {
                 cls += ' picked-by-me';
-                badge   = '<span class="gift-badge" style="background:#d4edda;color:#155724">Ваш выбор</span>';
+                badge   = '<span class="gift-badge badge-mine">Ваш выбор</span>';
                 pickBtn = `<button class="btn btn-secondary btn-sm mt-8" onclick="unpickGift(${g.id})">Отменить выбор</button>`;
               } else if (g.taken_external) {
                 cls += ' picked-by-other';
-                badge = '<span class="gift-badge" style="background:#f8d7da;color:#721c24">Занят</span>';
+                badge = '<span class="gift-badge badge-taken">Занят</span>';
               } else {
                 pickBtn = `<button class="btn btn-success btn-sm mt-8" onclick="pickGift(${g.id})">Выбрать</button>`;
               }
@@ -994,9 +994,9 @@
         const responses = frResponses || {};
         const multi = guests.length > 1;
         const arrivalLabelHtml = cottage_date_from
-          ? `<div style="margin-bottom:10px">
-               <span style="font-weight:600;color:#444">Дата заезда:</span>
-               <span style="color:#333;margin-left:6px">${formatDateRu(cottage_date_from)}</span>
+          ? `<div class="arrival-label">
+               <span class="al-key">Дата заезда:</span>
+               <span class="al-val">${formatDateRu(cottage_date_from)}</span>
              </div>`
           : '';
 
@@ -1019,7 +1019,7 @@
               </label>
               <div class="option-reveal cottage-wrap" data-guest="${g.id}" style="display:${going ? 'block' : 'none'}">
                 ${arrivalLabelHtml}
-                <label style="font-size:.85rem;color:#555;font-weight:bold;display:block;margin-bottom:8px">Выберите дату выезда</label>
+                <label class="picker-label">Выберите дату выезда</label>
                 <div class="cottage-picker" data-guest="${g.id}"></div>
               </div>
               <label class="option-card mt-16">
@@ -1259,7 +1259,7 @@
           const data = await api.invitePreview(token);
           if (data.error) {
             document.getElementById('page-content').innerHTML =
-              `<div style="text-align:center;padding:60px;color:#c00">${data.error}</div>`;
+              `<div class="page-status error">${data.error}</div>`;
             return;
           }
           // Confine the guest read-token to THIS tab so the admin session in
@@ -1272,7 +1272,7 @@
           if (pc) { pc.inert = true; pc.style.pointerEvents = 'none'; pc.style.userSelect = 'none'; }
         } catch (err) {
           document.getElementById('page-content').innerHTML =
-            `<div style="text-align:center;padding:60px;color:#c00">Ошибка предпросмотра: ${err.message}</div>`;
+            `<div class="page-status error">Ошибка предпросмотра: ${err.message}</div>`;
         }
         return;
       }
@@ -1286,7 +1286,7 @@
           const data = await api.invite(token);
           if (data.error) {
             document.getElementById('page-content').innerHTML =
-              `<div style="text-align:center;padding:60px;color:#c00">${data.error}</div>`;
+              `<div class="page-status error">${data.error}</div>`;
             return;
           }
           // Store guest JWT so authenticated API calls (gifts, forms) work correctly
@@ -1296,12 +1296,12 @@
           await renderPage(data);
         } catch (err) {
           document.getElementById('page-content').innerHTML =
-            `<div style="text-align:center;padding:60px;color:#c00">Ошибка: ${err.message}</div>`;
+            `<div class="page-status error">Ошибка: ${err.message}</div>`;
         }
       } else {
         requireGuest();
         document.getElementById('page-content').innerHTML = `
-          <div style="text-align:center;padding:60px;color:#888">
+          <div class="page-status">
             <p>Используйте ссылку-приглашение, отправленную вам.</p>
           </div>`;
       }
