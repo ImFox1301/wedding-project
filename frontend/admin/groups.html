@@ -148,6 +148,11 @@
 
       const memberIds = group ? group.members.map(m => m.id) : [];
       const membersList = document.getElementById('members-list');
+      // Clear any checkboxes left over from a previous open — otherwise the first
+      // renderMembers() below sees hasDOM=true and reads the checked state from
+      // that stale DOM instead of seeding from memberIds, silently un-checking
+      // the current members (and dropping them from the group on save).
+      membersList.innerHTML = '';
 
       function renderMembers() {
         // First render: no checkboxes in DOM yet → use memberIds as initial state.
