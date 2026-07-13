@@ -720,7 +720,7 @@ table.guests-table tbody tr { cursor: pointer; transition: background .12s; }
 .section-gallery-nav.next { right: 10px; }
 
 .section-gallery-thumbs {
-  display: flex; gap: 7px; margin-top: 8px; flex-wrap: wrap;
+  display: flex; gap: 7px; margin-top: 8px; flex-wrap: wrap; justify-content: center;
 }
 .section-gallery-thumb {
   width: 60px; height: 60px;
@@ -1537,18 +1537,27 @@ body.has-preview-banner { padding-top: 46px; }
 }
 
 /* ===== SECTIONS ===== */
+/* Each section is a soft card so that, with many sections, they read as distinct
+   blocks instead of merging into one long wall of text. */
 .invite-body .invite-section {
-  border-bottom: none;
-  margin-bottom: 40px;
-  padding-bottom: 0;
+  position: relative;
+  background: #fff;
+  border: 1px solid #ececea;
+  border-radius: 18px;
+  padding: 30px 32px;
+  margin-bottom: 26px;
+  box-shadow: 0 6px 22px rgba(0,0,0,.05);
 }
-.invite-body .invite-section:not(:last-child)::after {
+/* Warm accent stripe along the top edge to reinforce the boundary. */
+.invite-body .invite-section::before {
   content: "";
-  display: block;
-  width: 54px;
-  height: 1px;
-  background: #e4e4e2;
-  margin: 40px auto 0;
+  position: absolute;
+  top: 0;
+  left: 26px;
+  right: 26px;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: linear-gradient(90deg, transparent, #d8c3a3 20%, #b98e56 50%, #d8c3a3 80%, transparent);
 }
 .invite-body .invite-section h2 {
   font-family: var(--serif);
@@ -1927,9 +1936,11 @@ body.has-preview-banner { padding-top: 46px; }
 
 /* ===== MOBILE ===== */
 @media (max-width: 768px) {
-  .invite-body .invite-page { padding: 40px 16px 16px; }
+  .invite-body .invite-page { padding: 40px 14px 16px; }
   .invite-body .invite-header { margin-bottom: 40px; }
   .invite-body header { padding: 0 18px; }
+  .invite-body .invite-section { padding: 22px 18px; border-radius: 14px; }
+  .invite-body .invite-section::before { left: 16px; right: 16px; }
 
   /* Stop the whole page from being pushed sideways by any overflowing child.
      Fixes the slight layout drift on общие/персональные sections on mobile. */
