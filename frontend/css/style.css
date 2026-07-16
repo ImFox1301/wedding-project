@@ -2874,3 +2874,40 @@ body.has-preview-banner { padding-top: 46px; }
 /* Action bar with a single (link) button */
 .invite-body .gift-card-actions.single { grid-template-columns: 1fr; }
 .invite-body .gift-card-actions.single button:first-child { border-right: none; }
+
+/* Disabled option card (e.g. tournament locked until cottage is checked) */
+.invite-body .option-card:has(.option-input:disabled) {
+  opacity: .55;
+  cursor: not-allowed;
+}
+.invite-body .option-card:has(.option-input:disabled):hover {
+  border-color: var(--border);
+  background: var(--surface);
+  box-shadow: none;
+}
+
+/* Tournament info box — shown under the opponent select when the
+   tournament checkbox is ticked. Theme-aware via variables. */
+.invite-body .tournament-info {
+  margin-top: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 12px 12px 0;
+  padding: 14px 18px;
+}
+.invite-body .tournament-info .ti-head {
+  font-size: .76rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+.invite-body .tournament-info .ti-text {
+  font-size: .92rem;
+  line-height: 1.6;
+  color: var(--text-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+}

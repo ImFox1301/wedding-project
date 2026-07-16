@@ -918,6 +918,8 @@
       // Editable checkbox labels (with fallbacks)
       const L = labels || {};
       const lbl = (k, def) => (L[k] && L[k].trim()) ? L[k] : def;
+      // Info text shown under the tournament opponent select (empty = hidden)
+      const tournamentInfo = (L.label_tournament_info || '').trim();
 
       // Store fixed arrival date for saving
       cottageArrivalDate = cottage_date_from || '';
@@ -1008,7 +1010,8 @@
         const peopleHtml = guests.map(g => {
           const r = responses[g.id] || {};
           const going = !!r.going_cottage;
-          const tourn = !!r.tournament;
+          // Tournament is only available for guests going to the cottage
+          const tourn = !!r.tournament && going;
           const name = [g.first_name, g.last_name].filter(Boolean).join(' ');
           return `
             <div class="rsvp-person">
@@ -1033,7 +1036,7 @@
                   <span class="option-title">${lbl('label_tournament_title', 'Участвую в турнире')}</span>
                   <span class="option-desc">${lbl('label_tournament_desc', 'Дружеские соревнования')}</span>
                 </span>
-                <input type="checkbox" class="option-input fr-tourn" data-guest="${g.id}" ${tourn ? 'checked' : ''}>
+                <input type="checkbox" class="option-input fr-tourn" data-guest="${g.id}" ${tourn ? 'checked' : ''} ${going ? '' : 'disabled'}>
                 <span class="option-check"></span>
               </label>
               <div class="option-reveal opp-wrap" data-guest="${g.id}" style="display:${tourn ? 'block' : 'none'}">
@@ -1043,6 +1046,11 @@
                     <option value="">— без предпочтений —</option>
                   </select>
                 </div>
+                ${tournamentInfo ? `
+                <div class="tournament-info">
+                  <div class="ti-head">Справка для участников</div>
+                  <div class="ti-text">${escapeHtml(tournamentInfo)}</div>
+                </div>` : ''}
               </div>
             </div>`;
         }).join('');
@@ -1146,7 +1154,9 @@
         const isGroup  = guests.length > 1;
         const frMap    = frResponses || {};
 
-        // Per-guest cottage pickers (fixed arrival, guest picks departure)
+        // Per-guest cottage pickers (fixed arrival, guest picks departure).
+        // Departure defaults to the arrival date; pressing "Сбросить" returns
+        // it to that default instead of leaving it empty.
         cottagePickers = {};
         if (cottage_date_from) {
           document.querySelectorAll('.cottage-picker').forEach(el => {
@@ -1156,18 +1166,39 @@
               min:       cottage_date_from,
               max:       cottage_date_to || undefined,
               fixedFrom: cottage_date_from,
-              to:        r.cottage_date_to || '',
+              to:        r.cottage_date_to || cottage_date_from,
               labelTo:   'Дата выезда',
-              onChange:  () => scheduleSave(),
+              onChange:  (from, to) => {
+                if (!to) {
+                  // Reset pressed — restore the default (departure = arrival)
+                  cottagePickers[gid].setValue(cottage_date_from, cottage_date_from);
+                }
+                scheduleSave();
+              },
             });
           });
         }
 
-        // Per-guest cottage toggle
+        // Per-guest cottage toggle.
+        // Tournament depends on the cottage: it unlocks only when the guest
+        // goes to the cottage, and is reset + disabled when cottage is unchecked.
         document.querySelectorAll('.fr-cottage').forEach(cb => {
           cb.addEventListener('change', () => {
-            const w = document.querySelector(`.cottage-wrap[data-guest="${cb.dataset.guest}"]`);
+            const gid = cb.dataset.guest;
+            const w = document.querySelector(`.cottage-wrap[data-guest="${gid}"]`);
             if (w) w.style.display = cb.checked ? 'block' : 'none';
+
+            const tcb = document.querySelector(`.fr-tourn[data-guest="${gid}"]`);
+            if (tcb) {
+              tcb.disabled = !cb.checked;
+              if (!cb.checked) {
+                tcb.checked = false;
+                const ow = document.querySelector(`.opp-wrap[data-guest="${gid}"]`);
+                if (ow) ow.style.display = 'none';
+                const oppSel = document.querySelector(`.fr-opp[data-guest="${gid}"]`);
+                if (oppSel) oppSel.value = '';
+              }
+            }
             scheduleSave();
           });
         });

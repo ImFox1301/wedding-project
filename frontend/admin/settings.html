@@ -159,6 +159,20 @@
         </form>
       </div>
 
+      <!-- Tournament info text -->
+      <div class="card mb-16">
+        <div class="card-header"><h2>🏆 Справка для участников турнира</h2></div>
+        <p class="text-muted mb-16">Показывается гостю под выбором желаемого соперника, когда отмечен чекбокс «Участвую в турнире». Пусто — блок не показывается.</p>
+        <form id="tournament-info-form">
+          <div class="form-group">
+            <label>Текст справки</label>
+            <textarea class="form-control" id="label_tournament_info" rows="10"
+              placeholder="Правила турнира, формат, время проведения..."></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary">Сохранить</button>
+        </form>
+      </div>
+
       <!-- Chat settings -->
       <div class="card mb-16">
         <div class="card-header"><h2>💬 Чат — автоочистка истории</h2></div>
@@ -216,7 +230,8 @@
          'label_tournament_title', 'label_tournament_desc',
          'label_loft_title', 'label_loft_desc',
          'label_transport_title', 'label_transport_desc',
-         'label_answers_heading', 'label_gifts_heading'
+         'label_answers_heading', 'label_gifts_heading',
+         'label_tournament_info'
         ].forEach(k => { document.getElementById(k).value = s[k] || ''; });
 
         document.getElementById('chat-max-messages').value =
@@ -295,6 +310,19 @@
           label_gifts_heading:   document.getElementById('label_gifts_heading').value.trim(),
         });
         showAlert(document.getElementById('alert-container'), 'Заголовки блоков сохранены');
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    });
+
+    // Tournament info text
+    document.getElementById('tournament-info-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        await api.settings.update({
+          label_tournament_info: document.getElementById('label_tournament_info').value.trim(),
+        });
+        showAlert(document.getElementById('alert-container'), 'Справка для участников сохранена');
       } catch (err) {
         showAlert(document.getElementById('alert-container'), err.message, 'danger');
       }
