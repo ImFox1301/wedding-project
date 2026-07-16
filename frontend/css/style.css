@@ -2816,3 +2816,12 @@ body.has-preview-banner { padding-top: 46px; }
   border: 1px solid var(--border-strong);
 }
 .admin-body .photo-thumb-ps { border-color: var(--border-strong); }
+
+/* Gifts admin: "who gives" note (theme-aware) */
+.admin-body .gift-givers-note {
+  font-size: .78rem;
+  color: var(--text-2);
+  background: var(--surface-2);
+  border-radius: 6px;
+  padding: 5px 8px;
+}

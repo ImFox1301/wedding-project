@@ -164,11 +164,19 @@
     requireAdmin();
     function logout() { clearAuth(); window.location.href = '/login.html'; }
 
+    let allGifts = [];
+
+    function esc(s) {
+      return (s || '').replace(/[&<>"']/g, m => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]
+      ));
+    }
+
     async function load() {
       try {
-        const gifts = await api.gifts.list();
-        const friends = gifts.filter(g => g.role === 'friends');
-        const family  = gifts.filter(g => g.role === 'family');
+        allGifts = await api.gifts.list();
+        const friends = allGifts.filter(g => g.role === 'friends');
+        const family  = allGifts.filter(g => g.role === 'family');
         renderAll(friends, family);
       } catch (err) {
         showAlert(document.getElementById('alert-container'), err.message, 'danger');
@@ -204,15 +212,15 @@
           <div class="gift-admin-card-header">
             ${thumb}
             <div class="gift-admin-meta">
-              <div class="gift-admin-name">${g.name}</div>
-              ${g.description ? `<div class="gift-admin-desc">${g.description}</div>` : ''}
+              <div class="gift-admin-name">${esc(g.name)}</div>
+              ${g.description ? `<div class="gift-admin-desc">${esc(g.description)}</div>` : ''}
             </div>
           </div>
           ${tags.length ? `<div class="gift-admin-tags">${tags.join('')}</div>` : ''}
-          ${g.givers ? `<div style="font-size:.78rem;color:#475569;background:#f1f5f9;border-radius:6px;padding:5px 8px">🎁 Дарят: ${g.givers}</div>` : ''}
+          ${g.givers ? `<div class="gift-givers-note">🎁 Дарят: ${esc(g.givers)}</div>` : ''}
           <div class="gift-admin-footer">
-            <button class="btn btn-secondary btn-sm" onclick='editGift(${JSON.stringify(g)})'>✏️ Изменить</button>
-            <button class="btn btn-danger btn-sm" onclick="deleteGift(${g.id}, '${g.name.replace(/'/g, "\\'")}')">🗑</button>
+            <button class="btn btn-secondary btn-sm" onclick="editGift(${g.id})">✏️ Изменить</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteGift(${g.id})">🗑</button>
           </div>
         </div>`;
     }
@@ -260,7 +268,10 @@
     }
 
     function closeModal() { document.getElementById('modal').classList.remove('active'); }
-    function editGift(g)  { openModal(g); }
+    function editGift(id) {
+      const g = allGifts.find(x => x.id === id);
+      if (g) openModal(g);
+    }
 
     async function removePhoto() {
       const id = document.getElementById('gift-id').value;
@@ -275,8 +286,9 @@
       }
     }
 
-    async function deleteGift(id, name) {
-      if (!confirmDialog(`Удалить подарок «${name}»?`)) return;
+    async function deleteGift(id) {
+      const g = allGifts.find(x => x.id === id);
+      if (!confirmDialog(`Удалить подарок «${g ? g.name : ''}»?`)) return;
       try {
         await api.gifts.delete(id);
         await load();

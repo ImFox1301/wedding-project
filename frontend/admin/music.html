@@ -149,6 +149,12 @@
     let friendsTracks = [];
     let familyTracks  = [];
 
+    function esc(s) {
+      return (s || '').replace(/[&<>"']/g, m => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]
+      ));
+    }
+
     function parseName(raw) {
       const clean = (raw || '').replace(/\.[^/.]+$/, '');
       const sep = clean.indexOf(' - ');
@@ -187,10 +193,10 @@
             <span class="track-num">${i + 1}</span>
             <span class="track-icon">🎵</span>
             <div class="track-info">
-              <div class="track-title">${title}</div>
-              ${artist ? `<div class="track-artist">${artist}</div>` : ''}
+              <div class="track-title">${esc(title)}</div>
+              ${artist ? `<div class="track-artist">${esc(artist)}</div>` : ''}
             </div>
-            <button class="btn btn-danger btn-sm" onclick="deleteMusic(${t.id}, '${(t.original_name || t.filename).replace(/'/g, "\\'")}')">🗑</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteMusic(${t.id})">🗑</button>
           </div>`;
       }).join('');
 
@@ -266,7 +272,9 @@
       input.value = '';
     }
 
-    async function deleteMusic(id, name) {
+    async function deleteMusic(id) {
+      const t = friendsTracks.find(x => x.id === id) || familyTracks.find(x => x.id === id);
+      const name = t ? (t.original_name || t.filename) : '';
       if (!confirmDialog(`Удалить трек «${name}»?`)) return;
       try {
         await api.music.delete(id);

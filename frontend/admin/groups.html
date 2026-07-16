@@ -100,6 +100,13 @@
     function logout() { clearAuth(); window.location.href = '/login.html'; }
 
     let allGuests = [];
+    let allGroups = [];
+
+    function esc(s) {
+      return (s || '').replace(/[&<>"']/g, m => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]
+      ));
+    }
 
     function insertGroupPattern(pattern) {
       const input = document.getElementById('group-salutation');
@@ -113,6 +120,7 @@
       try {
         const [groups, guests] = await Promise.all([api.groups.list(), api.guests.list()]);
         allGuests = guests;
+        allGroups = groups;
         renderGroups(groups);
       } catch (err) {
         showAlert(document.getElementById('alert-container'), err.message, 'danger');
@@ -128,15 +136,15 @@
       el.innerHTML = groups.map(g => `
         <div class="card mb-16">
           <div class="card-header">
-            <h3>📁 ${g.name}</h3>
+            <h3>📁 ${esc(g.name)}</h3>
             <div class="flex gap-8">
               <button class="btn btn-secondary btn-sm" onclick="editGroup(${g.id})">✏️ Редактировать</button>
-              <button class="btn btn-danger btn-sm" onclick="deleteGroup(${g.id}, '${g.name}')">🗑 Удалить</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteGroup(${g.id})">🗑 Удалить</button>
             </div>
           </div>
           <div>
             ${g.members.length
-              ? g.members.map(m => `<span class="badge badge-friends" style="margin:2px">${m.full_name}</span>`).join('')
+              ? g.members.map(m => `<span class="badge badge-friends" style="margin:2px">${esc(m.full_name)}</span>`).join('')
               : '<span class="text-muted">Нет участников</span>'}
           </div>
         </div>
@@ -217,8 +225,9 @@
       }
     }
 
-    async function deleteGroup(id, name) {
-      if (!confirmDialog(`Удалить группу «${name}»?`)) return;
+    async function deleteGroup(id) {
+      const g = allGroups.find(x => x.id === id);
+      if (!confirmDialog(`Удалить группу «${g ? g.name : ''}»?`)) return;
       try {
         await api.groups.delete(id);
         await load();
