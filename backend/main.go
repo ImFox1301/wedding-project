@@ -99,6 +99,14 @@ func main() {
 		admin.DELETE("/music/:id", handlers.DeleteMusic)
 		admin.PUT("/music/:id/order", handlers.UpdateMusicOrder)
 
+		// Drinks (preferred drinks list)
+		admin.GET("/drinks", handlers.ListDrinks)
+		admin.POST("/drinks", handlers.CreateDrink)
+		admin.PUT("/drinks/:id", handlers.UpdateDrink)
+		admin.DELETE("/drinks/:id", handlers.DeleteDrink)
+		admin.GET("/drink-comments", handlers.ListDrinkComments)
+		admin.GET("/stats/drinks", handlers.StatsDrinks)
+
 		// Stats
 		admin.GET("/stats/visits", handlers.StatsVisits)
 		admin.GET("/stats/cottage", handlers.StatsCottage)

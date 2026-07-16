@@ -247,22 +247,46 @@ func GetInvitePage(c *gin.Context) {
 	// Per-guest friend responses + per-guest group gift picks (friends groups)
 	friendResponses := gin.H{}
 	groupGiftPicks := gin.H{}
+	drinksList := []gin.H{}
 	if role == "friends" {
+		// Admin-managed drinks list (shown under the cottage date picker)
+		if dRows, err := db.DB.Query(`SELECT id, name FROM drinks ORDER BY sort_order, id`); err == nil {
+			defer dRows.Close()
+			for dRows.Next() {
+				var id int
+				var name string
+				dRows.Scan(&id, &name)
+				drinksList = append(drinksList, gin.H{"id": id, "name": name})
+			}
+		}
 		for _, g := range guests {
 			var going bool
 			var df, dt *string
 			var tourn bool
 			var oppID *int
+			var drinksComment string
 			if err := db.DB.QueryRow(
-				`SELECT going_cottage, cottage_date_from::text, cottage_date_to::text, tournament, preferred_opponent_id
+				`SELECT going_cottage, cottage_date_from::text, cottage_date_to::text, tournament, preferred_opponent_id, drinks_comment
 				 FROM friend_responses WHERE guest_id=$1`, g.ID,
-			).Scan(&going, &df, &dt, &tourn, &oppID); err == nil {
+			).Scan(&going, &df, &dt, &tourn, &oppID, &drinksComment); err == nil {
+				// Guest's selected drinks
+				drinkIDs := []int{}
+				if gdRows, err := db.DB.Query(`SELECT drink_id FROM guest_drinks WHERE guest_id=$1`, g.ID); err == nil {
+					for gdRows.Next() {
+						var did int
+						gdRows.Scan(&did)
+						drinkIDs = append(drinkIDs, did)
+					}
+					gdRows.Close()
+				}
 				friendResponses[strconv.Itoa(g.ID)] = gin.H{
 					"going_cottage":         going,
 					"cottage_date_from":     df,
 					"cottage_date_to":       dt,
 					"tournament":            tourn,
 					"preferred_opponent_id": oppID,
+					"drinks":                drinkIDs,
+					"drinks_comment":        drinksComment,
 				}
 			}
 			var giftID *int
@@ -359,6 +383,7 @@ func GetInvitePage(c *gin.Context) {
 		"family_responses":  famResponses,
 		"group_gift_picks":  groupGiftPicks,
 		"group_salutation":  groupSalutation,
+		"drinks":            drinksList,
 		"attending":         attending,
 		"decline_text":      declineText,
 		"labels":            labels,
@@ -398,6 +423,8 @@ func SaveFriendResponse(c *gin.Context) {
 			CottageDateTo       *string `json:"cottage_date_to"`
 			Tournament          bool    `json:"tournament"`
 			PreferredOpponentID *int    `json:"preferred_opponent_id"`
+			Drinks              []int   `json:"drinks"`
+			DrinksComment       *string `json:"drinks_comment"`
 		} `json:"responses"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -445,6 +472,16 @@ func SaveFriendResponse(c *gin.Context) {
 			if err := upsert(r.GuestID, r.GoingCottage, r.CottageDateFrom, r.CottageDateTo, r.Tournament, r.PreferredOpponentID); err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
+			}
+			// Preferred drinks: replace the guest's set with the submitted one
+			if r.Drinks != nil {
+				db.DB.Exec(`DELETE FROM guest_drinks WHERE guest_id=$1`, r.GuestID)
+				for _, did := range r.Drinks {
+					db.DB.Exec(`INSERT INTO guest_drinks (guest_id, drink_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, r.GuestID, did)
+				}
+			}
+			if r.DrinksComment != nil {
+				db.DB.Exec(`UPDATE friend_responses SET drinks_comment=$2, updated_at=NOW() WHERE guest_id=$1`, r.GuestID, *r.DrinksComment)
 			}
 		}
 	} else if req.GoingCottage != nil {

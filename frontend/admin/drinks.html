@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Напитки — Админ</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/js/theme.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&display=swap">
+  <style>
+    .drink-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 0; border-bottom: 1px solid var(--border, #eee);
+    }
+    .drink-row:last-child { border-bottom: none; }
+    .drink-ico { font-size: 1.2rem; flex-shrink: 0; }
+    .drink-row input.form-control { flex: 1; }
+    .drink-count { font-size: .8rem; color: var(--muted, #888); white-space: nowrap; }
+  </style>
+</head>
+<body class="admin-body">
+  <header>
+    <a class="logo" href="/admin/">💍 Свадьба — Админ</a>
+    <div class="user-info"><button class="btn-logout" onclick="logout()">Выйти</button></div>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar">
+      <div class="sidebar-section">Гости</div>
+      <a href="/admin/guests.html">Гости</a>
+      <a href="/admin/groups.html">Группы</a>
+      <a href="/admin/links.html">Ссылки-приглашения</a>
+      <div class="sidebar-section">Контент</div>
+      <a href="/admin/editor.html">Редактор страниц</a>
+      <a href="/admin/personal-sections.html">Персональные разделы</a>
+      <a href="/admin/gifts.html">Подарки</a>
+      <a href="/admin/music.html">Музыка</a>
+      <a href="/admin/drinks.html" class="active">Напитки</a>
+      <div class="sidebar-section">Аналитика</div>
+      <a href="/admin/stats.html">Статистика</a>
+      <a href="/admin/comments.html">Комментарии</a>
+      <a href="/admin/chat.html">Чат</a>
+      <div class="sidebar-section">Прочее</div>
+      <a href="/admin/settings.html">Настройки</a>
+    </nav>
+
+    <main class="content">
+      <h1>Предпочитаемые напитки</h1>
+      <div id="alert-container"></div>
+      <p class="text-muted mb-16">
+        Список напитков показывается гостям-друзьям под выбором даты выезда (внутри опции «Еду в коттедж»).
+        Гость может отметить любое количество напитков. Статистика — во вкладке «Статистика»,
+        комментарии гостей — во вкладке «Комментарии» → «Напитки».
+      </p>
+
+      <div class="card mb-16" style="max-width:640px">
+        <div class="card-header"><h2>➕ Добавить напиток</h2></div>
+        <form id="add-form" class="flex gap-8">
+          <input type="text" class="form-control" id="new-drink-name" placeholder="Например: Красное вино" required>
+          <button type="submit" class="btn btn-primary" style="flex-shrink:0">Добавить</button>
+        </form>
+      </div>
+
+      <div class="card" style="max-width:640px">
+        <div class="card-header"><h2>🥂 Список напитков</h2></div>
+        <div id="drinks-list"><p class="text-muted">Загрузка…</p></div>
+      </div>
+    </main>
+  </div>
+
+  <footer><p>Панель администратора</p></footer>
+
+  <script src="/js/api.js"></script>
+  <script>
+    requireAdmin();
+    function logout() { clearAuth(); window.location.href = '/login.html'; }
+
+    let drinks = [];
+    let stats  = {};   // drink_id → count
+
+    function esc(s) {
+      return (s || '').replace(/[&<>"']/g, m => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]
+      ));
+    }
+
+    function render() {
+      const el = document.getElementById('drinks-list');
+      if (!drinks.length) {
+        el.innerHTML = '<p class="text-muted">Напитков пока нет. Добавьте первый!</p>';
+        return;
+      }
+      el.innerHTML = drinks.map(d => `
+        <div class="drink-row">
+          <span class="drink-ico">🥂</span>
+          <input class="form-control" value="${esc(d.name)}" onchange="renameDrink(${d.id}, this.value)">
+          <span class="drink-count">выбрали: ${stats[d.id] || 0}</span>
+          <button class="btn btn-danger btn-sm" onclick="deleteDrink(${d.id})">🗑</button>
+        </div>
+      `).join('');
+    }
+
+    async function load() {
+      try {
+        const [list, st] = await Promise.all([api.drinks.list(), api.stats.drinks()]);
+        drinks = list;
+        stats = {};
+        (st.drinks || []).forEach(r => { stats[r.id] = r.count; });
+        render();
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    }
+
+    document.getElementById('add-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const input = document.getElementById('new-drink-name');
+      const name = input.value.trim();
+      if (!name) return;
+      try {
+        await api.drinks.create({ name });
+        input.value = '';
+        await load();
+        showAlert(document.getElementById('alert-container'), 'Напиток добавлен');
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    });
+
+    async function renameDrink(id, name) {
+      name = (name || '').trim();
+      if (!name) { await load(); return; }
+      try {
+        await api.drinks.update(id, { name });
+        showAlert(document.getElementById('alert-container'), 'Название сохранено');
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+        await load();
+      }
+    }
+
+    async function deleteDrink(id) {
+      const d = drinks.find(x => x.id === id);
+      if (!confirmDialog(`Удалить напиток «${d ? d.name : ''}»? Выборы гостей тоже удалятся.`)) return;
+      try {
+        await api.drinks.delete(id);
+        await load();
+        showAlert(document.getElementById('alert-container'), 'Напиток удалён');
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>

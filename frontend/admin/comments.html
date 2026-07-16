@@ -27,6 +27,7 @@
       <a href="/admin/personal-sections.html">Персональные разделы</a>
       <a href="/admin/gifts.html">Подарки</a>
       <a href="/admin/music.html">Музыка</a>
+      <a href="/admin/drinks.html">Напитки</a>
       <div class="sidebar-section">Аналитика</div>
       <a href="/admin/stats.html">Статистика</a>
       <a href="/admin/comments.html" class="active">Комментарии</a>
@@ -37,11 +38,23 @@
 
     <main class="content">
       <h1>Комментарии гостей</h1>
-      <p class="text-muted mb-16">Здесь собраны комментарии, оставленные гостями в форме. Вы можете ответить — ответ увидит гость на своей странице-приглашении.</p>
       <div id="alert-container"></div>
 
-      <div class="stats-grid mb-16" id="comments-summary"></div>
-      <div id="comments-list"></div>
+      <div class="flex gap-8 mb-16">
+        <button class="btn btn-primary"   id="tab-general" onclick="setTab('general')">💬 Общие</button>
+        <button class="btn btn-secondary" id="tab-drinks"  onclick="setTab('drinks')">🥂 Напитки</button>
+      </div>
+
+      <div id="general-pane">
+        <p class="text-muted mb-16">Здесь собраны комментарии, оставленные гостями в форме. Вы можете ответить — ответ увидит гость на своей странице-приглашении.</p>
+        <div class="stats-grid mb-16" id="comments-summary"></div>
+        <div id="comments-list"></div>
+      </div>
+
+      <div id="drinks-pane" style="display:none">
+        <p class="text-muted mb-16">Комментарии и пожелания гостей по напиткам (из блока «Предпочитаемые напитки»).</p>
+        <div id="drink-comments-list"></div>
+      </div>
     </main>
   </div>
 
@@ -134,6 +147,42 @@
       }
     }
 
+    // ── Tabs (Общие / Напитки) ──
+    function setTab(tab) {
+      const general = tab === 'general';
+      document.getElementById('tab-general').className = general ? 'btn btn-primary' : 'btn btn-secondary';
+      document.getElementById('tab-drinks').className  = general ? 'btn btn-secondary' : 'btn btn-primary';
+      document.getElementById('general-pane').style.display = general ? '' : 'none';
+      document.getElementById('drinks-pane').style.display  = general ? 'none' : '';
+    }
+
+    function drinkCommentCard(c) {
+      return `
+        <div class="comment-card">
+          <div class="comment-card-head">
+            <div class="comment-author">
+              <div class="comment-avatar">${esc((c.first_name || '?').slice(0, 1))}</div>
+              <div>
+                <div class="comment-name">${esc(fullName(c))} ${roleBadge(c.role)}</div>
+                <div class="comment-date">${fmtDateTime(c.updated_at)}</div>
+              </div>
+            </div>
+          </div>
+          <div class="comment-bubble">${esc(c.comment)}</div>
+        </div>`;
+    }
+
+    async function loadDrinkComments() {
+      try {
+        const list = await api.drinks.comments();
+        document.getElementById('drink-comments-list').innerHTML = list.length
+          ? list.map(drinkCommentCard).join('')
+          : '<div class="card"><p class="text-muted">Пожеланий по напиткам пока нет.</p></div>';
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    }
+
     async function load() {
       try {
         const comments = await api.comments.list();
@@ -156,6 +205,7 @@
     }
 
     load();
+    loadDrinkComments();
   </script>
 </body>
 </html>

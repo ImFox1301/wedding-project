@@ -2911,3 +2911,48 @@ body.has-preview-banner { padding-top: 46px; }
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* ==================================================================
+   Preferred drinks block (invite, friends / cottage) — theme-aware.
+   ================================================================== */
+.invite-body .drinks-block { margin-top: 18px; }
+.invite-body .drinks-title {
+  font-size: .95rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+.invite-body .drinks-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.invite-body .drink-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 12px;
+  cursor: pointer;
+  font-size: .9rem;
+  color: var(--text-2);
+  transition: border-color .15s, background .15s;
+  user-select: none;
+}
+.invite-body .drink-item:hover { border-color: var(--border-strong); background: var(--surface-2); }
+.invite-body .drink-item input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.invite-body .drink-item:has(input:checked) {
+  border-color: rgba(143,177,221,.55);
+  background: rgba(143,177,221,.1);
+  color: var(--text);
+}
+.invite-body .fr-drinks-comment { resize: vertical; }

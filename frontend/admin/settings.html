@@ -27,6 +27,7 @@
       <a href="/admin/personal-sections.html">Персональные разделы</a>
       <a href="/admin/gifts.html">Подарки</a>
       <a href="/admin/music.html">Музыка</a>
+      <a href="/admin/drinks.html">Напитки</a>
       <div class="sidebar-section">Аналитика</div>
       <a href="/admin/stats.html">Статистика</a>
       <a href="/admin/comments.html">Комментарии</a>
@@ -294,83 +295,4 @@
     document.getElementById('decline-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       try {
-        await api.settings.update({ decline_text: document.getElementById('decline-text').value.trim() });
-        showAlert(document.getElementById('alert-container'), 'Текст отказа сохранён');
-      } catch (err) {
-        showAlert(document.getElementById('alert-container'), err.message, 'danger');
-      }
-    });
-
-    // Section headings
-    document.getElementById('headings-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      try {
-        await api.settings.update({
-          label_answers_heading: document.getElementById('label_answers_heading').value.trim(),
-          label_gifts_heading:   document.getElementById('label_gifts_heading').value.trim(),
-        });
-        showAlert(document.getElementById('alert-container'), 'Заголовки блоков сохранены');
-      } catch (err) {
-        showAlert(document.getElementById('alert-container'), err.message, 'danger');
-      }
-    });
-
-    // Tournament info text
-    document.getElementById('tournament-info-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      try {
-        await api.settings.update({
-          label_tournament_info: document.getElementById('label_tournament_info').value.trim(),
-        });
-        showAlert(document.getElementById('alert-container'), 'Справка для участников сохранена');
-      } catch (err) {
-        showAlert(document.getElementById('alert-container'), err.message, 'danger');
-      }
-    });
-
-    // Checkbox labels
-    document.getElementById('labels-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const keys = ['label_cottage_title', 'label_cottage_desc',
-        'label_tournament_title', 'label_tournament_desc',
-        'label_loft_title', 'label_loft_desc',
-        'label_transport_title', 'label_transport_desc'];
-      const data = {};
-      keys.forEach(k => { data[k] = document.getElementById(k).value.trim(); });
-      try {
-        await api.settings.update(data);
-        showAlert(document.getElementById('alert-container'), 'Подписи опций сохранены');
-      } catch (err) {
-        showAlert(document.getElementById('alert-container'), err.message, 'danger');
-      }
-    });
-
-    // Chat max messages
-    document.getElementById('chat-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      let n = parseInt(document.getElementById('chat-max-messages').value, 10);
-      if (isNaN(n) || n < 0) n = 0;
-      try {
-        await api.settings.update({ chat_max_messages: String(n) });
-        showAlert(document.getElementById('alert-container'), 'Настройки чата сохранены');
-      } catch (err) {
-        showAlert(document.getElementById('alert-container'), err.message, 'danger');
-      }
-    });
-
-    async function saveCottage() {
-      try {
-        await api.settings.update({
-          cottage_date_from: cottageFrom,
-          cottage_date_to:   cottageTo,
-        });
-        showAlert(document.getElementById('alert-container'), 'Период коттеджа сохранён');
-      } catch (err) {
-        showAlert(document.getElementById('alert-container'), err.message, 'danger');
-      }
-    }
-
-    load();
-  </script>
-</body>
-</html>
+        await api.setting

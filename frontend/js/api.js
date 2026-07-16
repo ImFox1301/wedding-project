@@ -115,6 +115,15 @@ const api = {
     create: (data) => api.post('/admin/personal-sections', data),
   },
 
+  // Admin - drinks (preferred drinks list)
+  drinks: {
+    list:     ()         => api.get('/admin/drinks'),
+    create:   (data)     => api.post('/admin/drinks', data),
+    update:   (id, data) => api.put('/admin/drinks/' + id, data),
+    delete:   (id)       => api.delete('/admin/drinks/' + id),
+    comments: ()         => api.get('/admin/drink-comments'),
+  },
+
   // Admin - settings
   settings: {
     get:    ()         => api.get('/admin/settings'),
@@ -145,6 +154,7 @@ const api = {
     tournament: () => api.get('/admin/stats/tournament'),
     loft:       () => api.get('/admin/stats/loft'),
     attendance: () => api.get('/admin/stats/attendance'),
+    drinks:     () => api.get('/admin/stats/drinks'),
   },
 
   // Admin - comments

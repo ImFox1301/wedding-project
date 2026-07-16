@@ -730,6 +730,9 @@
         const tourn = !!(tcb && tcb.checked);
         const oppSel = document.querySelector(`.fr-opp[data-guest="${key}"]`);
         const opp   = oppSel && oppSel.value ? parseInt(oppSel.value) : null;
+        const drinkIds = [...document.querySelectorAll(`.fr-drink[data-guest="${key}"]:checked`)]
+          .map(el => parseInt(el.value));
+        const dcEl = document.querySelector(`.fr-drinks-comment[data-guest="${key}"]`);
         responses.push({
           guest_id:              parseInt(key),
           going_cottage:         going,
@@ -737,6 +740,8 @@
           cottage_date_to:       going ? (toDate || null)             : null,
           tournament:            tourn,
           preferred_opponent_id: tourn ? opp : null,
+          drinks:                drinkIds,
+          drinks_comment:        dcEl ? dcEl.value : '',
         });
       });
       const comment = (document.getElementById('comment-text') || {}).value || '';
@@ -913,7 +918,9 @@
               group_salutation: groupSalutation,
               cottage_date_from, cottage_date_to, page_subtitle,
               header_text, footer_text, attending,
-              decline_text: declineText, labels } = data;
+              decline_text: declineText, labels,
+              drinks: drinksList } = data;
+      const drinks = drinksList || [];
 
       // Editable checkbox labels (with fallbacks)
       const L = labels || {};
@@ -1029,6 +1036,20 @@
                 ${arrivalLabelHtml}
                 <label class="picker-label">Выберите дату выезда</label>
                 <div class="cottage-picker" data-guest="${g.id}"></div>
+                ${drinks.length ? `
+                <div class="drinks-block">
+                  <div class="drinks-title">🥂 Предпочитаемые напитки</div>
+                  <div class="drinks-list">
+                    ${drinks.map(d => `
+                    <label class="drink-item">
+                      <input type="checkbox" class="fr-drink" data-guest="${g.id}" value="${d.id}"
+                        ${(r.drinks || []).includes(d.id) ? 'checked' : ''}>
+                      <span>${escapeHtml(d.name)}</span>
+                    </label>`).join('')}
+                  </div>
+                  <textarea class="form-control fr-drinks-comment" data-guest="${g.id}" rows="3"
+                    placeholder="Комментарии/Пожелания по напиткам">${escapeHtml(r.drinks_comment || '')}</textarea>
+                </div>` : ''}
               </div>
               <label class="option-card mt-16">
                 <span class="option-icon">🏆</span>
@@ -1230,6 +1251,12 @@
         } catch {}
 
         document.getElementById('comment-text').addEventListener('input', scheduleSave);
+
+        // Drinks: checkboxes + per-guest comment autosave
+        document.querySelectorAll('.fr-drink').forEach(cb =>
+          cb.addEventListener('change', scheduleSave));
+        document.querySelectorAll('.fr-drinks-comment').forEach(ta =>
+          ta.addEventListener('input', scheduleSave));
 
         // Gifts: group → member selector on cards; single guest → classic cards
         _isGiftGroup = isGroup;

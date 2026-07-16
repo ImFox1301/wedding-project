@@ -27,6 +27,7 @@
       <a href="/admin/personal-sections.html">Персональные разделы</a>
       <a href="/admin/gifts.html">Подарки</a>
       <a href="/admin/music.html">Музыка</a>
+      <a href="/admin/drinks.html">Напитки</a>
       <div class="sidebar-section">Аналитика</div>
       <a href="/admin/stats.html" class="active">Статистика</a>
       <a href="/admin/comments.html">Комментарии</a>
@@ -69,6 +70,12 @@
             <tbody id="cottage-tbody"></tbody>
           </table>
         </div>
+      </div>
+
+      <!-- Drinks -->
+      <div class="card mb-16">
+        <div class="card-header"><h2>🥂 Предпочитаемые напитки</h2></div>
+        <div class="charts-grid mt-16" id="drinks-chart"></div>
       </div>
 
       <!-- Tournament -->
@@ -177,12 +184,13 @@
     // ── Load & render ──────────────────────────────
     async function load() {
       try {
-        const [visits, cottage, tourn, loft, attend] = await Promise.all([
+        const [visits, cottage, tourn, loft, attend, drinksStat] = await Promise.all([
           api.stats.visits(),
           api.stats.cottage(),
           api.stats.tournament(),
           api.stats.loft(),
           api.stats.attendance(),
+          api.stats.drinks(),
         ]);
 
         const C = { opened: '#5a9e5a', notOpened: '#dcdcdc', friends: '#6b6b6b',
@@ -281,6 +289,18 @@
         document.getElementById('cottage-tbody').innerHTML = cottage.guest_dates.map(gd => `
           <tr><td>${gd.last_name} ${gd.first_name}</td><td>${gd.date_from}</td><td>${gd.date_to}</td></tr>
         `).join('') || '<tr><td colspan="3" class="text-muted">Нет данных</td></tr>';
+
+        // Drinks — pie chart with percentages
+        const drinkRows = (drinksStat.drinks || []).filter(d => d.count > 0);
+        const drinkTotal = drinkRows.reduce((a, d) => a + d.count, 0);
+        const drinkSegs = drinkRows.map((d, i) => ({
+          label: d.name,
+          value: d.count,
+          color: `hsl(${(i * 47) % 360}, 45%, 55%)`,
+        }));
+        document.getElementById('drinks-chart').innerHTML = drinkSegs.length
+          ? donutCard('Выборы напитков', drinkSegs, drinkTotal, 'выборов')
+          : '<p class="text-muted">Гости ещё не выбирали напитки (или список пуст).</p>';
 
         // Tournament table
         document.getElementById('tourn-tbody').innerHTML = tourn.participants.map(p => `

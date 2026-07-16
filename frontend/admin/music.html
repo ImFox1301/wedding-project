@@ -100,6 +100,7 @@
       <a href="/admin/personal-sections.html">Персональные разделы</a>
       <a href="/admin/gifts.html">Подарки</a>
       <a href="/admin/music.html" class="active">Музыка</a>
+      <a href="/admin/drinks.html">Напитки</a>
       <div class="sidebar-section">Аналитика</div>
       <a href="/admin/stats.html">Статистика</a>
       <a href="/admin/comments.html">Комментарии</a>
@@ -278,14 +279,4 @@
       if (!confirmDialog(`Удалить трек «${name}»?`)) return;
       try {
         await api.music.delete(id);
-        await load();
-        showAlert(document.getElementById('alert-container'), 'Трек удалён');
-      } catch (err) {
-        showAlert(document.getElementById('alert-container'), err.message, 'danger');
-      }
-    }
-
-    load();
-  </script>
-</body>
-</html>
+  

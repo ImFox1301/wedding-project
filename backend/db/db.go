@@ -161,6 +161,19 @@ func Migrate() {
 			gift_id INTEGER REFERENCES gifts(id) ON DELETE SET NULL,
 			updated_at TIMESTAMP DEFAULT NOW()
 		)`,
+		// Preferred drinks (friends / cottage): admin-managed list + per-guest picks
+		`CREATE TABLE IF NOT EXISTS drinks (
+			id SERIAL PRIMARY KEY,
+			name VARCHAR(255) NOT NULL,
+			sort_order INTEGER DEFAULT 0,
+			created_at TIMESTAMP DEFAULT NOW()
+		)`,
+		`CREATE TABLE IF NOT EXISTS guest_drinks (
+			guest_id INTEGER NOT NULL REFERENCES guests(id) ON DELETE CASCADE,
+			drink_id INTEGER NOT NULL REFERENCES drinks(id) ON DELETE CASCADE,
+			PRIMARY KEY (guest_id, drink_id)
+		)`,
+		`ALTER TABLE friend_responses ADD COLUMN IF NOT EXISTS drinks_comment TEXT NOT NULL DEFAULT ''`,
 		// Default settings
 		`INSERT INTO admin_settings (key, value) VALUES
 			('cottage_date_from',      ''),
