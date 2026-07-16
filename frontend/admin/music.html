@@ -279,4 +279,14 @@
       if (!confirmDialog(`Удалить трек «${name}»?`)) return;
       try {
         await api.music.delete(id);
-  
+        await load();
+        showAlert(document.getElementById('alert-container'), 'Трек удалён');
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>

@@ -254,4 +254,13 @@
         }
         closeModal();
         await load();
-        showAlert(docume
+        showAlert(document.getElementById('alert-container'), id ? 'Группа обновлена' : 'Группа создана');
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    });
+
+    load();
+  </script>
+</body>
+</html>
