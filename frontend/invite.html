@@ -487,15 +487,18 @@
         if (notPickable.length) html += `<h3 class="gifts-subhead">Выберите подарок</h3>`;
         html += `<div class="gifts-grid">
           ${pickable.map(g => {
-            // Photo / link action bar (shared by both modes)
-            const photoBtn = g.photo_filename
-              ? `<button onclick="openGiftPhoto('/uploads/${g.photo_filename}')">📷 см. фото</button>`
-              : `<button disabled>📷 см. фото</button>`;
+            // Photo shown directly in the card (uniform size);
+            // clicking it opens the full image in the modal.
+            const photoHtml = g.photo_filename
+              ? `<div class="gift-photo" onclick="openGiftPhoto('/uploads/${g.photo_filename}')" title="Открыть фото">
+                   <img src="/uploads/${g.photo_filename}" alt="" loading="lazy">
+                 </div>`
+              : '';
             const linkBtn = g.link_url
-              ? `<button onclick="window.open('${g.link_url}','_blank')">🔗 ссылка</button>`
-              : `<button disabled>🔗 ссылка</button>`;
+              ? `<button data-url="${escapeHtml(g.link_url)}" onclick="window.open(this.dataset.url,'_blank')">🔗 Открыть ссылку</button>`
+              : '';
 
-            let cls = 'gift-card has-actions';
+            let cls = 'gift-card' + (linkBtn ? ' has-actions' : '');
             let pickArea = '';
 
             if (_isGiftGroup) {
@@ -551,8 +554,9 @@
             }
 
             return `<div class="${cls}" id="gift-${g.id}">
+              ${photoHtml}
               <div class="gift-pick-area">${pickArea}</div>
-              <div class="gift-card-actions">${photoBtn}${linkBtn}</div>
+              ${linkBtn ? `<div class="gift-card-actions single">${linkBtn}</div>` : ''}
             </div>`;
           }).join('')}
         </div>`;

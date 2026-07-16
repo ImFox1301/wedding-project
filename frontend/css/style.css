@@ -2825,3 +2825,52 @@ body.has-preview-banner { padding-top: 46px; }
   border-radius: 6px;
   padding: 5px 8px;
 }
+
+/* ==================================================================
+   Gift card photo (invite page) — uniform image shown in the card,
+   full-bleed to the card edges; click opens the fullscreen modal.
+   ================================================================== */
+.invite-body .gift-photo {
+  position: relative;
+  height: 150px;                 /* uniform for every card */
+  margin: -14px -14px 12px;      /* bleed over the card's 14px padding */
+  overflow: hidden;
+  cursor: zoom-in;
+  background: rgba(127,127,127,.1);
+  flex-shrink: 0;
+}
+.invite-body .gift-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;             /* same width/height for all photos */
+  display: block;
+  transition: transform .35s cubic-bezier(.22,.61,.36,1);
+}
+.invite-body .gift-photo:hover img { transform: scale(1.05); }
+/* Small zoom hint in the corner */
+.invite-body .gift-photo::after {
+  content: "🔍";
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(0,0,0,.45);
+  color: #fff;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity .2s;
+  pointer-events: none;
+}
+.invite-body .gift-photo:hover::after { opacity: 1; }
+@media (pointer: coarse) {
+  .invite-body .gift-photo::after { opacity: .8; } /* always hint on touch */
+}
+
+/* Action bar with a single (link) button */
+.invite-body .gift-card-actions.single { grid-template-columns: 1fr; }
+.invite-body .gift-card-actions.single button:first-child { border-right: none; }
