@@ -1049,7 +1049,7 @@
 
         html += `
         <div class="invite-section">
-          <h2>📋 Ваши ответы</h2>
+          <h2>${lbl('label_answers_heading', '📋 Ваши ответы')}</h2>
           ${multi ? '<p class="text-muted mb-16">Отметьте, пожалуйста, ответ для каждого гостя.</p>' : ''}
           <form class="guest-form" id="friend-form">
             <div class="rsvp-people">${peopleHtml}</div>
@@ -1057,7 +1057,7 @@
         </div>
 
         <div class="invite-section" id="gifts-section">
-          <h2>🎁 Список подарков</h2>
+          <h2>${lbl('label_gifts_heading', '🎁 Список подарков')}</h2>
           <div class="gifts-body"></div>
         </div>
 
@@ -1117,13 +1117,13 @@
 
         html += `
         <div class="invite-section">
-          <h2>📋 Ваши ответы</h2>
+          <h2>${lbl('label_answers_heading', '📋 Ваши ответы')}</h2>
           ${multi ? '<p class="text-muted mb-16">Отметьте, пожалуйста, ответ для каждого гостя.</p>' : ''}
           <div class="rsvp-people">${peopleHtml}</div>
         </div>
 
         <div class="invite-section" id="gifts-section">
-          <h2>🎁 Список подарков</h2>
+          <h2>${lbl('label_gifts_heading', '🎁 Список подарков')}</h2>
           <p class="text-muted mb-16">Выберите подарок, который хотите подарить.</p>
           <div class="gifts-body"></div>
         </div>`;

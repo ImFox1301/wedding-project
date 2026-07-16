@@ -336,6 +336,7 @@ func GetInvitePage(c *gin.Context) {
 		"label_tournament_title", "label_tournament_desc",
 		"label_loft_title", "label_loft_desc",
 		"label_transport_title", "label_transport_desc",
+		"label_answers_heading", "label_gifts_heading",
 	} {
 		var v string
 		db.DB.QueryRow(`SELECT value FROM admin_settings WHERE key=$1`, k).Scan(&v)

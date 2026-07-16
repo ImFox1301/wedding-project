@@ -91,6 +91,25 @@
         </form>
       </div>
 
+      <!-- Section headings -->
+      <div class="card mb-16">
+        <div class="card-header"><h2>📌 Заголовки блоков</h2></div>
+        <p class="text-muted mb-16">Заголовки разделов «Ваши ответы» и «Список подарков» на странице-приглашении. Пусто — используется текст по умолчанию.</p>
+        <form id="headings-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Блок ответов гостя</label>
+              <input type="text" class="form-control" id="label_answers_heading" placeholder="📋 Ваши ответы">
+            </div>
+            <div class="form-group">
+              <label>Блок подарков</label>
+              <input type="text" class="form-control" id="label_gifts_heading" placeholder="🎁 Список подарков">
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary">Сохранить</button>
+        </form>
+      </div>
+
       <!-- Checkbox labels -->
       <div class="card mb-16">
         <div class="card-header"><h2>☑️ Подписи опций (чекбоксов)</h2></div>
@@ -196,7 +215,8 @@
         ['label_cottage_title', 'label_cottage_desc',
          'label_tournament_title', 'label_tournament_desc',
          'label_loft_title', 'label_loft_desc',
-         'label_transport_title', 'label_transport_desc'
+         'label_transport_title', 'label_transport_desc',
+         'label_answers_heading', 'label_gifts_heading'
         ].forEach(k => { document.getElementById(k).value = s[k] || ''; });
 
         document.getElementById('chat-max-messages').value =
@@ -261,6 +281,20 @@
       try {
         await api.settings.update({ decline_text: document.getElementById('decline-text').value.trim() });
         showAlert(document.getElementById('alert-container'), 'Текст отказа сохранён');
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
+    });
+
+    // Section headings
+    document.getElementById('headings-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        await api.settings.update({
+          label_answers_heading: document.getElementById('label_answers_heading').value.trim(),
+          label_gifts_heading:   document.getElementById('label_gifts_heading').value.trim(),
+        });
+        showAlert(document.getElementById('alert-container'), 'Заголовки блоков сохранены');
       } catch (err) {
         showAlert(document.getElementById('alert-container'), err.message, 'danger');
       }
