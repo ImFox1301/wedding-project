@@ -186,11 +186,6 @@
             <input type="text" class="form-control" id="subtitle"
               placeholder="Например: Ждём именно тебя! 💛">
           </div>
-          <label class="switch">
-            <input type="checkbox" id="am-i-gosha">
-            <span class="track"></span>
-            <span>Отметить как «Гошу» (am_i_gosha)</span>
-          </label>
         </div>
 
         <div class="modal-footer">
@@ -356,7 +351,6 @@
       const tbody = document.getElementById('guests-tbody');
       tbody.innerHTML = guests.map(g => {
         const fio = [g.last_name, g.first_name, g.middle_name].filter(Boolean).join(' ');
-        const goshaChip = g.am_i_gosha ? ' <span class="chip-gosha" title="Гоша">Гоша</span>' : '';
         const salu = g.custom_salutation
           ? `<span class="salu" title="${esc(g.custom_salutation)}">${esc(g.custom_salutation)}</span>`
           : '<span class="text-muted">по умолчанию</span>';
@@ -369,7 +363,7 @@
             <div class="g-cell-name">
               <span class="g-avatar role-${g.role}">${esc(initials(g)).toUpperCase()}</span>
               <span class="g-name-wrap">
-                <span class="g-name">${esc(fio)}${goshaChip}</span>
+                <span class="g-name">${esc(fio)}</span>
                 <span class="g-login">@${esc(g.login)}</span>
               </span>
             </div>
@@ -399,7 +393,6 @@
       document.getElementById('custom-salutation').value = guest ? (guest.custom_salutation || '') : '';
       document.getElementById('subtitle').value = guest ? (guest.subtitle || '') : '';
       document.getElementById('group-id').value = guest && guest.group_id ? guest.group_id : '';
-      document.getElementById('am-i-gosha').checked = guest ? guest.am_i_gosha : false;
 
       // Login info line
       document.getElementById('mg-login').textContent = guest && guest.login ? '@' + guest.login : '';
@@ -449,7 +442,7 @@
         gender:            val('gender'),
         custom_salutation: val('custom-salutation').trim(),
         subtitle:          val('subtitle').trim(),
-        am_i_gosha:        document.getElementById('am-i-gosha').checked,
+        am_i_gosha:        false,
         group_id:          val('group-id') ? parseInt(val('group-id')) : null,
       };
       try {

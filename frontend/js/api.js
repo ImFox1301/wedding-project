@@ -9,22 +9,56 @@ function getToken() {
 }
 
 function setAuth(token, role, guestId) {
-  localStorage.setItem('token', token);
-  localStorage.setItem('role', role);
-  if (guestId) localStorage.setItem('guest_id', guestId);
+  // Storage may be unavailable (private mode / embedded browsers) — never crash
+  try {
+    localStorage.setItem('token', token);
+    localStorage.setItem('role', role);
+    if (guestId) localStorage.setItem('guest_id', guestId);
+  } catch (e) {}
 }
 
 function clearAuth() {
-  localStorage.removeItem('token');
-  localStorage.removeItem('role');
-  localStorage.removeItem('guest_id');
+  try {
+    localStorage.removeItem('token');
+    localStorage.removeItem('role');
+    localStorage.removeItem('guest_id');
+  } catch (e) {}
+}
+
+// Invite token of the guest's personal link. Persisted so an expired or lost
+// auth token can be silently re-issued instead of kicking the guest to login.
+function rememberInviteToken(t) {
+  try { localStorage.setItem('invite_token', t); } catch (e) {}
+}
+function getInviteToken() {
+  const fromUrl = new URLSearchParams(window.location.search).get('token');
+  if (fromUrl) return fromUrl;
+  try { return localStorage.getItem('invite_token'); } catch (e) { return null; }
+}
+
+// Try to get a fresh guest JWT using the invite link token.
+// Returns true on success (auth storage updated).
+async function refreshGuestToken() {
+  if (getRole() === 'admin') return false;   // never touch the admin session
+  const t = getInviteToken();
+  if (!t) return false;
+  try {
+    const res = await fetch(API_BASE + '/invite/' + t);
+    if (!res.ok) return false;
+    const data = await res.json();
+    if (data && data.guest_token) {
+      setAuth(data.guest_token, data.role, data.guest_id);
+      return true;
+    }
+  } catch (e) {}
+  return false;
 }
 
 function getRole() {
   return localStorage.getItem('role');
 }
 
-async function apiRequest(method, path, body, isFormData) {
+async function apiRequest(method, path, body, isFormData, _retried) {
   const token = getToken();
   const headers = {};
   if (token) headers['Authorization'] = 'Bearer ' + token;
@@ -37,6 +71,11 @@ async function apiRequest(method, path, body, isFormData) {
 
   const res = await fetch(API_BASE + path, opts);
   if (res.status === 401) {
+    // Guest token expired or was lost: silently re-issue it via the invite
+    // link token and retry once, instead of kicking the guest to the login page.
+    if (!_retried && await refreshGuestToken()) {
+      return apiRequest(method, path, body, isFormData, true);
+    }
     clearAuth();
     window.location.href = '/login.html';
     return;

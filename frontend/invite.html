@@ -151,11 +151,15 @@
         .replace(/\{\{full_name\}\}/g,   [g.last_name, g.first_name, g.middle_name].filter(Boolean).join(' '));
     }
 
-    // Render section content — handles both HTML (WYSIWYG) and legacy plain text
+    // Render section content — handles both HTML (WYSIWYG) and legacy plain text.
+    // Images embedded via the editor get lazy loading so heavy sections don't
+    // block the initial render.
     function renderContent(content, guests) {
       if (!content) return '';
-      const s = applyTemplate(content, guests);
-      return s.trim().startsWith('<') ? s : s.replace(/\n/g, '<br>');
+      let s = applyTemplate(content, guests);
+      if (!s.trim().startsWith('<')) return s.replace(/\n/g, '<br>');
+      s = s.replace(/<img (?![^>]*\bloading=)/g, '<img loading="lazy" decoding="async" ');
+      return s;
     }
 
     // ──────────────────────────────────────────────
@@ -385,43 +389,6 @@
     }
 
     // ──────────────────────────────────────────────
-    // GOSHA BUTTON
-    // ──────────────────────────────────────────────
-    function goshaBtnBehavior(btn, canPress) {
-      if (canPress) {
-        btn.onclick = () => { btn.textContent = '🎉 ТЫ ГОША!!!'; btn.style.background = '#27ae60'; btn.disabled = true; };
-      } else {
-        // Capture natural position, then re-parent to <body> so position:fixed is
-        // always relative to the viewport (never a transformed/positioned ancestor),
-        // and clamp into the viewport with a small safety margin.
-        const M = 8; // keep-on-screen margin
-        const initR = btn.getBoundingClientRect();
-        const w = btn.offsetWidth, h = btn.offsetHeight;
-        const clampX = x => Math.max(M, Math.min(window.innerWidth  - w - M, x));
-        const clampY = y => Math.max(M, Math.min(window.innerHeight - h - M, y));
-        document.body.appendChild(btn);
-        btn.style.position = 'fixed';
-        btn.style.margin = '0';
-        btn.style.zIndex = '400';
-        btn.style.left = clampX(initR.left) + 'px';
-        btn.style.top  = clampY(initR.top)  + 'px';
-
-        function flee(e) {
-          const r  = btn.getBoundingClientRect();
-          const mx = e.clientX || (e.touches && e.touches[0]?.clientX) || r.left + r.width/2;
-          const my = e.clientY || (e.touches && e.touches[0]?.clientY) || r.top  + r.height/2;
-          const dx = (r.left + r.width/2) - mx, dy = (r.top + r.height/2) - my;
-          const d  = Math.sqrt(dx*dx + dy*dy) || 1;
-          btn.style.left = clampX(r.left + dx/d*160) + 'px';
-          btn.style.top  = clampY(r.top  + dy/d*160) + 'px';
-        }
-        btn.addEventListener('mousemove', flee);
-        btn.addEventListener('touchmove', flee, { passive: true });
-        btn.onclick = e => e.preventDefault();
-      }
-    }
-
-    // ──────────────────────────────────────────────
     // GIFTS
     // ──────────────────────────────────────────────
     let gifts = [];
@@ -491,7 +458,7 @@
             // clicking it opens the full image in the modal.
             const photoHtml = g.photo_filename
               ? `<div class="gift-photo" onclick="openGiftPhoto('/uploads/${g.photo_filename}')" title="Открыть фото">
-                   <img src="/uploads/${g.photo_filename}" alt="" loading="lazy">
+                   <img src="/uploads/${g.photo_filename}" alt="" loading="lazy" decoding="async">
                  </div>`
               : '';
             const linkBtn = g.link_url
@@ -908,9 +875,6 @@
     // ──────────────────────────────────────────────
     async function renderPage(data) {
       _data = data;
-      // The "Я Гоша" button flees into <body> (position:fixed); remove any stray
-      // copy from a previous render so re-renders don't accumulate duplicates.
-      document.querySelectorAll('body > .gosha-btn').forEach(b => b.remove());
       const { guests, role, sections, friend_response: fr,
               friend_responses: frResponses,
               family_responses: fmResponses,
@@ -986,8 +950,8 @@
         html += `</div>`; // invite-page
         document.getElementById('page-content').innerHTML = html;
         setupReveal();
-        if (getToken() && !musicInited) { musicInited = true; await initMusic(); }
-        if (getToken() && !chatInited)  { chatInited  = true; await initChat();  }
+        if (getToken() && !musicInited) { musicInited = true; initMusic(); }
+        if (getToken() && !chatInited)  { chatInited  = true; initChat();  }
         return;
       }
 
@@ -1102,10 +1066,6 @@
             <div class="host-reply-head">💌 Ответ организаторов</div>
             <div class="host-reply-text">${escapeHtml(fd.admin_reply)}</div>
           </div>` : ''}
-        </div>
-
-        <div class="gosha-btn-wrap">
-          <button class="gosha-btn" id="gosha-btn">Я ГОША</button>
         </div>`;
       }
 
@@ -1233,9 +1193,17 @@
           });
         });
 
+        // Load gifts and the friends list in parallel — both are independent
+        // network requests, so the page becomes interactive sooner.
+        _isGiftGroup = isGroup;
+        _groupGuests = guests;
+        _groupPicks  = Object.assign({}, groupGiftPicks || {});
+        const giftsPromise   = reloadGifts();
+        const friendsPromise = api.friendsList(true).catch(() => []);
+
         // Opponent selects (all friends, excluding that guest)
         try {
-          const friends = await api.friendsList(true);
+          const friends = await friendsPromise;
           document.querySelectorAll('.fr-opp').forEach(sel => {
             const gid = parseInt(sel.dataset.guest);
             const r   = frMap[sel.dataset.guest] || {};
@@ -1259,13 +1227,7 @@
           ta.addEventListener('input', scheduleSave));
 
         // Gifts: group → member selector on cards; single guest → classic cards
-        _isGiftGroup = isGroup;
-        _groupGuests = guests;
-        _groupPicks  = Object.assign({}, groupGiftPicks || {});
-        await reloadGifts();
-
-        // Gosha button
-        goshaBtnBehavior(document.getElementById('gosha-btn'), guests.some(g => g.am_i_gosha));
+        await giftsPromise;
       }
 
       if (role === 'family') {
@@ -1288,8 +1250,9 @@
 
       // Music + chat (init once; live outside page-content, survive re-renders).
       // Skipped in preview — no autoplay, no live chat websocket for the admin.
-      if (!_preview && getToken() && !musicInited) { musicInited = true; await initMusic(); }
-      if (!_preview && getToken() && !chatInited)  { chatInited  = true; await initChat();  }
+      // Fire-and-forget: neither should block the page becoming interactive.
+      if (!_preview && getToken() && !musicInited) { musicInited = true; initMusic(); }
+      if (!_preview && getToken() && !chatInited)  { chatInited  = true; initChat();  }
     }
 
     // Fixed banner shown in preview mode so it's obvious this isn't the live page.
@@ -1340,18 +1303,27 @@
         return;
       }
 
-      if (token) {
+      // Fall back to the last used invite token: helps guests whose auth
+      // storage was cleared or who re-opened invite.html without the query.
+      let inviteToken = token;
+      if (!inviteToken && getRole() !== 'admin') {
+        try { inviteToken = localStorage.getItem('invite_token'); } catch (e) {}
+      }
+
+      if (inviteToken) {
         // Public token — open without login. Guests invited by link have no
         // account to sign out of, so hide the logout button.
         const logoutBtn = document.querySelector('.btn-logout');
         if (logoutBtn) logoutBtn.style.display = 'none';
         try {
-          const data = await api.invite(token);
+          const data = await api.invite(inviteToken);
           if (data.error) {
             document.getElementById('page-content').innerHTML =
               `<div class="page-status error">${data.error}</div>`;
             return;
           }
+          // Remember the link token for silent auth refresh on 401
+          rememberInviteToken(inviteToken);
           // Store guest JWT so authenticated API calls (gifts, forms) work correctly
           if (data.guest_token) {
             setAuth(data.guest_token, data.role, data.guest_id);
