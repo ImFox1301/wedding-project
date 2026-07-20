@@ -2956,3 +2956,20 @@ body.has-preview-banner { padding-top: 46px; }
   color: var(--text);
 }
 .invite-body .fr-drinks-comment { resize: vertical; }
+
+/* ==================================================================
+   Quill content classes on the guest page. The editor styles content
+   with ql-* classes (quill.snow.css), which isn't loaded on the
+   invitation page — recreate the needed rules here.
+   ================================================================== */
+.invite-section .ql-align-center  { text-align: center; }
+.invite-section .ql-align-right   { text-align: right; }
+.invite-section .ql-align-justify { text-align: justify; }
+/* Indent levels used by the editor's toolbar */
+.invite-section .ql-indent-1 { padding-left: 3em; }
+.invite-section .ql-indent-2 { padding-left: 6em; }
+.invite-section .ql-indent-3 { padding-left: 9em; }
+.invite-section .ql-indent-4 { padding-left: 12em; }
+/* Lists keep alignment too */
+.invite-section li.ql-align-center { list-style-position: inside; }
+.invite-section li.ql-align-right  { list-style-position: inside; }
