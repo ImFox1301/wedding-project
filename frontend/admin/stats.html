@@ -61,7 +61,7 @@
 
       <!-- Cottage -->
       <div class="card mb-16">
-        <div class="card-header"><h2>🏡 Коттедж — даты заезда</h2></div>
+        <div class="card-header"><h2>🏡 Коттедж — гости по дням пребывания</h2></div>
         <div class="stats-grid" id="cottage-summary"></div>
         <div class="chart-bar-wrap mt-16" id="cottage-chart"></div>
         <div class="table-wrap mt-16">
@@ -277,8 +277,21 @@
         document.getElementById('cottage-summary').innerHTML = `
           <div class="stat-card"><div class="stat-number">${cottageGoing}</div><div class="stat-label">Едут в коттедж</div></div>
         `;
+        // Occupancy per day: every guest counts towards each date of their stay
+        // (arrival .. departure inclusive). The arrival date is the same for
+        // everyone, so grouping only by it would collapse into a single bar.
+        const fmtDay = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         const dateCounts = {};
-        cottage.guest_dates.forEach(gd => { dateCounts[gd.date_from] = (dateCounts[gd.date_from] || 0) + 1; });
+        cottage.guest_dates.forEach(gd => {
+          if (!gd.date_from) return;
+          const from = new Date(gd.date_from + 'T00:00:00');
+          const to   = new Date((gd.date_to || gd.date_from) + 'T00:00:00');
+          let guard = 0;
+          for (let d = new Date(from); d <= to && guard < 60; d.setDate(d.getDate() + 1), guard++) {
+            const key = fmtDay(d);
+            dateCounts[key] = (dateCounts[key] || 0) + 1;
+          }
+        });
         const dateChartData = Object.entries(dateCounts)
           .sort((a, b) => a[0].localeCompare(b[0]))
           .map(([date, count]) => ({ label: date, value: count, color: '#6b8ea0' }));
