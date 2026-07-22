@@ -103,11 +103,37 @@ func StatsCottage(c *gin.Context) {
 		guestDates = []GuestDateRow{}
 	}
 
+	// Friends who are NOT going to the cottage: explicit "no" or no answer yet
+	type NotGoingRow struct {
+		GuestID     int    `json:"guest_id"`
+		LastName    string `json:"last_name"`
+		FirstName   string `json:"first_name"`
+		HasResponse bool   `json:"has_response"`
+	}
+	notGoing := []NotGoingRow{}
+	ngRows, _ := db.DB.Query(`
+		SELECT g.id, g.last_name, g.first_name, (fr.guest_id IS NOT NULL) AS has_response
+		FROM guests g
+		LEFT JOIN friend_responses fr ON fr.guest_id = g.id
+		WHERE g.role = 'friends'
+		  AND (fr.guest_id IS NULL OR fr.going_cottage = FALSE)
+		ORDER BY g.last_name, g.first_name
+	`)
+	if ngRows != nil {
+		defer ngRows.Close()
+		for ngRows.Next() {
+			var r NotGoingRow
+			ngRows.Scan(&r.GuestID, &r.LastName, &r.FirstName, &r.HasResponse)
+			notGoing = append(notGoing, r)
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"date_from":   dateFrom,
 		"date_to":     dateTo,
 		"ranges":      ranges,
 		"guest_dates": guestDates,
+		"not_going":   notGoing,
 	})
 }
 
