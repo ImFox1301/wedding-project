@@ -66,7 +66,13 @@
         <div class="chart-bar-wrap mt-16" id="cottage-chart"></div>
         <div class="table-wrap mt-16">
           <table id="cottage-table">
-            <thead><tr><th>Гость</th><th>Дата заезда</th><th>Дата выезда</th><th></th></tr></thead>
+            <thead><tr>
+              <th>Гость</th>
+              <th>Дата заезда</th>
+              <th style="cursor:pointer;user-select:none" onclick="sortCottage()"
+                  title="Сортировать по дате выезда">Дата выезда <span id="cottage-sort-arrow">▲</span></th>
+              <th></th>
+            </tr></thead>
             <tbody id="cottage-tbody"></tbody>
           </table>
         </div>
@@ -187,6 +193,34 @@
           <div class="mp-track"><div class="mp-fill" style="width:${pct}%;background:${color}"></div></div>
         </div>
       </div>`;
+    }
+
+    // ── Cottage table: sorting by departure date ───
+    let _cottageSortDir = 1;   // 1 = ascending, -1 = descending
+
+    function renderCottageTable() {
+      const rows = [..._cottageGuests].sort((a, b) => {
+        const byDate = (a.date_to || '').localeCompare(b.date_to || '') * _cottageSortDir;
+        if (byDate !== 0) return byDate;
+        return `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`, 'ru');
+      });
+      document.getElementById('cottage-sort-arrow').textContent = _cottageSortDir === 1 ? '▲' : '▼';
+      document.getElementById('cottage-tbody').innerHTML = rows.map(gd => `
+        <tr>
+          <td>${gd.last_name} ${gd.first_name}</td>
+          <td>${gd.date_from}</td>
+          <td>${gd.date_to}</td>
+          <td style="text-align:right">
+            <button class="btn btn-danger btn-sm" onclick="resetCottage(${gd.guest_id})"
+              title="Обнулить выбор дат и снять «Еду в коттедж»">✕ Сбросить</button>
+          </td>
+        </tr>
+      `).join('') || '<tr><td colspan="4" class="text-muted">Нет данных</td></tr>';
+    }
+
+    function sortCottage() {
+      _cottageSortDir = -_cottageSortDir;
+      renderCottageTable();
     }
 
     // ── Cottage reset (per guest) ──────────────────
@@ -326,17 +360,7 @@
           ? barChart(dateChartData, maxDate)
           : '<p class="text-muted">Нет данных</p>';
         _cottageGuests = cottage.guest_dates;
-        document.getElementById('cottage-tbody').innerHTML = cottage.guest_dates.map(gd => `
-          <tr>
-            <td>${gd.last_name} ${gd.first_name}</td>
-            <td>${gd.date_from}</td>
-            <td>${gd.date_to}</td>
-            <td style="text-align:right">
-              <button class="btn btn-danger btn-sm" onclick="resetCottage(${gd.guest_id})"
-                title="Обнулить выбор дат и снять «Еду в коттедж»">✕ Сбросить</button>
-            </td>
-          </tr>
-        `).join('') || '<tr><td colspan="4" class="text-muted">Нет данных</td></tr>';
+        renderCottageTable();
 
         // Not going / not answered
         document.getElementById('cottage-notgoing-tbody').innerHTML = notGoing.map(g => `
