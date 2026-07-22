@@ -110,6 +110,7 @@ func main() {
 		// Stats
 		admin.GET("/stats/visits", handlers.StatsVisits)
 		admin.GET("/stats/cottage", handlers.StatsCottage)
+		admin.DELETE("/stats/cottage/:guestId", handlers.ResetCottageResponse)
 		admin.GET("/stats/tournament", handlers.StatsTournament)
 		admin.GET("/stats/loft", handlers.StatsLoft)
 		admin.GET("/stats/attendance", handlers.StatsAttendance)

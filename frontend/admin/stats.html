@@ -66,7 +66,7 @@
         <div class="chart-bar-wrap mt-16" id="cottage-chart"></div>
         <div class="table-wrap mt-16">
           <table id="cottage-table">
-            <thead><tr><th>Гость</th><th>Дата заезда</th><th>Дата выезда</th></tr></thead>
+            <thead><tr><th>Гость</th><th>Дата заезда</th><th>Дата выезда</th><th></th></tr></thead>
             <tbody id="cottage-tbody"></tbody>
           </table>
         </div>
@@ -179,6 +179,22 @@
           <div class="mp-track"><div class="mp-fill" style="width:${pct}%;background:${color}"></div></div>
         </div>
       </div>`;
+    }
+
+    // ── Cottage reset (per guest) ──────────────────
+    let _cottageGuests = [];
+
+    async function resetCottage(guestId) {
+      const g = _cottageGuests.find(x => x.guest_id === guestId);
+      const name = g ? `${g.last_name} ${g.first_name}` : '';
+      if (!confirmDialog(`Сбросить выбор коттеджа у гостя «${name}»?\nДаты удалятся, чекбокс «Еду в коттедж» будет снят (турнир тоже сбросится).`)) return;
+      try {
+        await api.stats.resetCottage(guestId);
+        showAlert(document.getElementById('alert-container'), 'Выбор коттеджа сброшен');
+        await load();
+      } catch (err) {
+        showAlert(document.getElementById('alert-container'), err.message, 'danger');
+      }
     }
 
     // ── Load & render ──────────────────────────────
@@ -299,9 +315,18 @@
         document.getElementById('cottage-chart').innerHTML = dateChartData.length
           ? barChart(dateChartData, maxDate)
           : '<p class="text-muted">Нет данных</p>';
+        _cottageGuests = cottage.guest_dates;
         document.getElementById('cottage-tbody').innerHTML = cottage.guest_dates.map(gd => `
-          <tr><td>${gd.last_name} ${gd.first_name}</td><td>${gd.date_from}</td><td>${gd.date_to}</td></tr>
-        `).join('') || '<tr><td colspan="3" class="text-muted">Нет данных</td></tr>';
+          <tr>
+            <td>${gd.last_name} ${gd.first_name}</td>
+            <td>${gd.date_from}</td>
+            <td>${gd.date_to}</td>
+            <td style="text-align:right">
+              <button class="btn btn-danger btn-sm" onclick="resetCottage(${gd.guest_id})"
+                title="Обнулить выбор дат и снять «Еду в коттедж»">✕ Сбросить</button>
+            </td>
+          </tr>
+        `).join('') || '<tr><td colspan="4" class="text-muted">Нет данных</td></tr>';
 
         // Drinks — pie chart with percentages
         const drinkRows = (drinksStat.drinks || []).filter(d => d.count > 0);

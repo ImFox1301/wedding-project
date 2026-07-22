@@ -194,6 +194,7 @@ const api = {
     loft:       () => api.get('/admin/stats/loft'),
     attendance: () => api.get('/admin/stats/attendance'),
     drinks:     () => api.get('/admin/stats/drinks'),
+    resetCottage: (guestId) => api.delete('/admin/stats/cottage/' + guestId),
   },
 
   // Admin - comments

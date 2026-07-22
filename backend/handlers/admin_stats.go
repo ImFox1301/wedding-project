@@ -77,13 +77,14 @@ func StatsCottage(c *gin.Context) {
 
 	// Also return per-date count for chart
 	dateRows, _ := db.DB.Query(`
-		SELECT g.last_name, g.first_name, fr.cottage_date_from::text, fr.cottage_date_to::text
+		SELECT g.id, g.last_name, g.first_name, fr.cottage_date_from::text, fr.cottage_date_to::text
 		FROM friend_responses fr
 		JOIN guests g ON g.id = fr.guest_id
 		WHERE fr.going_cottage = TRUE AND fr.cottage_date_from IS NOT NULL
 		ORDER BY fr.cottage_date_from
 	`)
 	type GuestDateRow struct {
+		GuestID   int    `json:"guest_id"`
 		LastName  string `json:"last_name"`
 		FirstName string `json:"first_name"`
 		DateFrom  string `json:"date_from"`
@@ -94,7 +95,7 @@ func StatsCottage(c *gin.Context) {
 		defer dateRows.Close()
 		for dateRows.Next() {
 			var r GuestDateRow
-			dateRows.Scan(&r.LastName, &r.FirstName, &r.DateFrom, &r.DateTo)
+			dateRows.Scan(&r.GuestID, &r.LastName, &r.FirstName, &r.DateFrom, &r.DateTo)
 			guestDates = append(guestDates, r)
 		}
 	}
@@ -108,6 +109,31 @@ func StatsCottage(c *gin.Context) {
 		"ranges":      ranges,
 		"guest_dates": guestDates,
 	})
+}
+
+// ResetCottageResponse clears a guest's cottage choice from the stats page:
+// unchecks "Еду в коттедж", removes the dates, and resets the dependent
+// tournament answer (it is only available to guests going to the cottage).
+func ResetCottageResponse(c *gin.Context) {
+	guestID := c.Param("guestId")
+	res, err := db.DB.Exec(`
+		UPDATE friend_responses
+		SET going_cottage = FALSE,
+		    cottage_date_from = NULL,
+		    cottage_date_to = NULL,
+		    tournament = FALSE,
+		    preferred_opponent_id = NULL,
+		    updated_at = NOW()
+		WHERE guest_id = $1`, guestID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "ответ гостя не найден"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
 func StatsTournament(c *gin.Context) {
