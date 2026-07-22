@@ -398,8 +398,24 @@
     let _groupGuests = [];
     let _groupPicks  = {};   // guest_id → gift_id
 
+    // Robust wishlist loading: transient network failures (mobile!) are
+    // retried automatically; after that the guest gets a visible retry button
+    // instead of a silently empty block.
     async function reloadGifts() {
-      try { gifts = await api.guestGifts(); renderGifts(); } catch {}
+      if (!giftsContainer) return;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          gifts = await api.guestGifts();
+          renderGifts();
+          return;
+        } catch (e) {
+          if (attempt < 3) await new Promise(r => setTimeout(r, attempt * 1200));
+        }
+      }
+      const body = giftsContainer.querySelector('.gifts-body');
+      if (body) body.innerHTML = `
+        <p class="text-muted mb-8">Не удалось загрузить список подарков. Проверьте соединение.</p>
+        <button class="btn btn-secondary btn-sm" onclick="reloadGifts()">↻ Попробовать ещё раз</button>`;
     }
 
     // When the chat WS is live, the server echoes a `gift_update` after every
@@ -1051,7 +1067,7 @@
 
         <div class="invite-section" id="gifts-section">
           <h2>${lbl('label_gifts_heading', '🎁 Список подарков')}</h2>
-          <div class="gifts-body"></div>
+          <div class="gifts-body"><p class="text-muted">Загрузка списка подарков…</p></div>
         </div>
 
         <div class="invite-section">
@@ -1114,7 +1130,7 @@
         <div class="invite-section" id="gifts-section">
           <h2>${lbl('label_gifts_heading', '🎁 Список подарков')}</h2>
           <p class="text-muted mb-16">Выберите подарок, который хотите подарить.</p>
-          <div class="gifts-body"></div>
+          <div class="gifts-body"><p class="text-muted">Загрузка списка подарков…</p></div>
         </div>`;
       }
 
